@@ -1072,10 +1072,39 @@ export default function Home() {
         </div>
       </div>
 
-      <KnowledgeGraphRail graph={KNOWLEDGE_GRAPH} T={T} active={active} onSection={scrollTo} />
+      <KnowledgeGraphRail graph={KNOWLEDGE_GRAPH} T={T} active={active} />
 
       {/* ── 전역 스타일 ── */}
       <style>{`
+        * {
+          scrollbar-width: thin;
+          scrollbar-color: ${T.green} ${T.surface};
+        }
+        *::-webkit-scrollbar {
+          width: 10px;
+          height: 10px;
+        }
+        *::-webkit-scrollbar-track {
+          background: ${T.surface};
+          border-left: 1px solid ${T.border};
+        }
+        *::-webkit-scrollbar-thumb {
+          background: ${T.green};
+          border: 3px solid ${T.surface};
+          border-radius: 999px;
+        }
+        *::-webkit-scrollbar-thumb:hover {
+          background: ${T.greenLight};
+        }
+        #scroll-area::-webkit-scrollbar-track,
+        .mobile-drawer::-webkit-scrollbar-track {
+          background: ${T.bg};
+        }
+        #scroll-area::-webkit-scrollbar-thumb,
+        .mobile-drawer::-webkit-scrollbar-thumb {
+          background: ${T.green};
+          border-color: ${T.bg};
+        }
         @media (max-width: 1180px) {
           #knowledge-rail { display: none !important; }
           .scroll-inner { max-width: clamp(720px, 68vw, 1080px) !important; }

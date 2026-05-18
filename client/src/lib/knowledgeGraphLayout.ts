@@ -88,3 +88,20 @@ export function layoutKnowledgeGraph(graph: KnowledgeGraphData, width: number, h
 
   return { nodes: positioned, links };
 }
+
+export function curvedKnowledgeLinkPath(link: PositionedKnowledgeLink): string {
+  const sx = link.source.x;
+  const sy = link.source.y;
+  const tx = link.target.x;
+  const ty = link.target.y;
+  const dx = tx - sx;
+  const dy = ty - sy;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const bend = Math.min(28, 8 + link.weight * 4);
+  const normalX = -dy / length;
+  const normalY = dx / length;
+  const cx = Math.round((sx + tx) / 2 + normalX * bend);
+  const cy = Math.round((sy + ty) / 2 + normalY * bend);
+
+  return `M ${sx} ${sy} Q ${cx} ${cy} ${tx} ${ty}`;
+}

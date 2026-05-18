@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { KnowledgeGraphData } from "./knowledgeGraph";
-import { layoutKnowledgeGraph } from "./knowledgeGraphLayout";
+import { curvedKnowledgeLinkPath, layoutKnowledgeGraph } from "./knowledgeGraphLayout";
 
 const graph: KnowledgeGraphData = {
   nodes: [
@@ -39,5 +39,14 @@ describe("layoutKnowledgeGraph", () => {
     expect(layout.links[0]).toEqual(expect.objectContaining({ sourceId: "profile", targetId: "project:a" }));
     expect(layout.links[0].source.x).toBe(130);
     expect(layout.links.length).toBe(graph.links.length);
+  });
+
+  it("generates curved neural edge paths instead of straight line commands", () => {
+    const layout = layoutKnowledgeGraph(graph, 260, 340);
+    const path = curvedKnowledgeLinkPath(layout.links[0]);
+
+    expect(path).toMatch(/^M \d+ \d+ Q /);
+    expect(path).toContain("130 170");
+    expect(path).not.toContain(" L ");
   });
 });
