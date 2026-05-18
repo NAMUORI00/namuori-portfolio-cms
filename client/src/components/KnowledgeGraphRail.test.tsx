@@ -21,7 +21,10 @@ describe("KnowledgeGraphRail", () => {
     const html = renderToStaticMarkup(<KnowledgeGraphRail graph={graph} T={LIGHT} active="about" />);
 
     expect(html).toContain('aria-hidden="true"');
-    expect(html).toContain('class="knowledge-canvas"');
+    expect(html).toContain("knowledge-canvas");
+    expect(html).toContain("knowledge-root-canvas");
+    expect(html).toContain("knowledge-root-spine");
+    expect(html).toContain("knowledge-root-thread");
     expect(html).toContain('class="knowledge-hit"');
     expect(html).toContain('class="knowledge-hover-layer"');
     expect(html).toContain('pointer-events="all"');

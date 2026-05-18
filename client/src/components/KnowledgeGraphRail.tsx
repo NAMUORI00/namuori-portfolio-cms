@@ -70,6 +70,7 @@ export function KnowledgeGraphRail({
     [layout.nodes],
   );
   const topNodes = layout.nodes.filter((node) => node.kind !== "profile").slice(0, 4);
+  const profileNode = layout.nodes.find((node) => node.kind === "profile");
 
   return (
     <aside
@@ -91,10 +92,10 @@ export function KnowledgeGraphRail({
     >
       <div>
         <div style={{ color: T.green, fontFamily: FONT_MONO, fontSize: "0.62rem", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-          Knowledge Graph
+          Knowledge Roots
         </div>
         <p style={{ margin: "0.35rem 0 0", color: T.sub, fontFamily: FONT_SANS, fontSize: "0.72rem", lineHeight: 1.6, wordBreak: "keep-all" }}>
-          콘텐츠의 태그, 관련 노트, 자연어 키워드로 매 배포마다 다시 그려지는 관심사 지도입니다.
+          프로필에서 프로젝트와 키워드가 나무뿌리처럼 갈라지는 관심사 지도입니다.
         </p>
       </div>
 
@@ -110,7 +111,7 @@ export function KnowledgeGraphRail({
         }}
       >
         <svg
-          className="knowledge-canvas"
+          className="knowledge-canvas knowledge-root-canvas"
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           aria-hidden="true"
           focusable="false"
@@ -128,7 +129,29 @@ export function KnowledgeGraphRail({
           </defs>
           <rect x="0" y="0" width={WIDTH} height={HEIGHT} fill={T.bg} />
           <rect x="0" y="0" width={WIDTH} height={HEIGHT} fill="url(#knowledge-grid)" />
-          <circle cx={WIDTH / 2} cy={HEIGHT / 2} r="118" fill="url(#knowledge-vignette)" />
+          <circle cx={WIDTH / 2} cy={HEIGHT * 0.48} r="128" fill="url(#knowledge-vignette)" />
+          {profileNode && (
+            <>
+              <path
+                className="knowledge-root-spine"
+                d={`M ${profileNode.x} ${Math.max(18, profileNode.y - 42)} C ${profileNode.x - 10} ${profileNode.y - 10} ${profileNode.x + 8} ${profileNode.y + 34} ${profileNode.x} ${HEIGHT - 24}`}
+                fill="none"
+                stroke={T.green}
+                strokeWidth="2.2"
+                strokeOpacity="0.16"
+                strokeLinecap="round"
+              />
+              <path
+                className="knowledge-root-spine knowledge-root-spine-soft"
+                d={`M ${profileNode.x} ${profileNode.y - 18} C ${profileNode.x + 16} ${profileNode.y + 24} ${profileNode.x - 20} ${profileNode.y + 112} ${profileNode.x + 4} ${HEIGHT - 32}`}
+                fill="none"
+                stroke={T.greenLight}
+                strokeWidth="0.85"
+                strokeOpacity="0.18"
+                strokeLinecap="round"
+              />
+            </>
+          )}
           {layout.links.map((link) => {
             const isLit = !focusNode || link.sourceId === focusNode.id || link.targetId === focusNode.id;
             const edgeState = !focusNode ? "idle" : isLit ? "active" : "dim";
@@ -136,13 +159,13 @@ export function KnowledgeGraphRail({
             return (
               <g key={`${link.sourceId}-${link.targetId}-${link.kind}`}>
                 <path
-                  className="knowledge-edge knowledge-edge-base"
+                  className="knowledge-edge knowledge-edge-base knowledge-root-thread"
                   data-connects={`${link.sourceId} ${link.targetId}`}
                   data-edge-state={edgeState}
                   d={path}
                   fill="none"
                   stroke={link.kind === "related" ? T.greenLight : T.muted}
-                  strokeWidth={isLit ? Math.max(0.65, Math.min(1.55, link.weight / 1.8)) : 0.55}
+                  strokeWidth={isLit ? Math.max(0.7, Math.min(1.7, link.weight / 1.7)) : 0.52}
                   strokeOpacity={edgeState === "active" ? (hoveredNode ? 0.58 : 0.34) : 0.09}
                   strokeLinecap="round"
                 />
@@ -241,6 +264,12 @@ export function KnowledgeGraphRail({
           }
           #knowledge-rail .knowledge-edge {
             transition: stroke-opacity 180ms ease, stroke-width 180ms ease;
+          }
+          #knowledge-rail .knowledge-root-spine {
+            filter: drop-shadow(0 0 8px ${T.green}24);
+          }
+          #knowledge-rail .knowledge-root-thread {
+            stroke-linejoin: round;
           }
           #knowledge-rail .knowledge-node {
             transform-box: fill-box;

@@ -24,17 +24,27 @@ function distanceBetween(layout: ReturnType<typeof layoutKnowledgeGraph>, leftId
   return Math.hypot(left.x - right.x, left.y - right.y);
 }
 
-describe("layoutKnowledgeGraph", () => {
-  it("places the profile node at the center and all other nodes inside the rail", () => {
-    const layout = layoutKnowledgeGraph(graph, 260, 340);
-    const profile = layout.nodes.find((node) => node.id === "profile");
+function nodeById(layout: ReturnType<typeof layoutKnowledgeGraph>, id: string) {
+  const node = layout.nodes.find((item) => item.id === id);
+  if (!node) throw new Error(`Missing node ${id}`);
+  return node;
+}
 
-    expect(profile?.x).toBe(130);
-    expect(profile?.y).toBe(170);
+describe("layoutKnowledgeGraph", () => {
+  it("places the profile node as a root origin above the branching layers", () => {
+    const layout = layoutKnowledgeGraph(graph, 260, 340);
+    const profile = nodeById(layout, "profile");
+    const project = nodeById(layout, "project:a");
+    const term = nodeById(layout, "term:rag");
+
+    expect(profile.x).toBe(130);
+    expect(profile.y).toBeLessThan(118);
+    expect(project.y).toBeGreaterThan(profile.y + 34);
+    expect(term.y).toBeGreaterThan(project.y + 34);
     for (const node of layout.nodes) {
-      expect(node.x).toBeGreaterThanOrEqual(16);
-      expect(node.x).toBeLessThanOrEqual(244);
-      expect(node.y).toBeGreaterThanOrEqual(16);
+      expect(node.x).toBeGreaterThanOrEqual(22);
+      expect(node.x).toBeLessThanOrEqual(238);
+      expect(node.y).toBeGreaterThanOrEqual(28);
       expect(node.y).toBeLessThanOrEqual(324);
       expect(node.radius).toBeGreaterThan(2);
     }
@@ -48,16 +58,16 @@ describe("layoutKnowledgeGraph", () => {
     expect(layout.links.length).toBe(graph.links.length);
   });
 
-  it("generates curved neural edge paths instead of straight line commands", () => {
+  it("generates root-like cubic paths instead of straight line commands", () => {
     const layout = layoutKnowledgeGraph(graph, 260, 340);
     const path = curvedKnowledgeLinkPath(layout.links[0]);
 
-    expect(path).toMatch(/^M \d+ \d+ Q /);
-    expect(path).toContain("130 170");
+    expect(path).toMatch(/^M \d+ \d+ C /);
+    expect(path).toContain(`M 130 ${nodeById(layout, "profile").y}`);
     expect(path).not.toContain(" L ");
   });
 
-  it("pulls linked terms closer than unrelated terms for an Obsidian-like cluster", () => {
+  it("pulls linked terms under their parent branch for a root-like cluster", () => {
     const clustered: KnowledgeGraphData = {
       nodes: [
         { id: "profile", label: "NAMUORI00", kind: "profile", weight: 5 },
@@ -71,7 +81,10 @@ describe("layoutKnowledgeGraph", () => {
       ],
     };
     const layout = layoutKnowledgeGraph(clustered, 260, 340);
+    const project = nodeById(layout, "project:a");
+    const linked = nodeById(layout, "term:linked");
 
+    expect(linked.y).toBeGreaterThan(project.y);
     expect(distanceBetween(layout, "project:a", "term:linked")).toBeLessThan(distanceBetween(layout, "project:a", "term:unlinked"));
   });
 });
