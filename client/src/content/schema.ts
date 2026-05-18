@@ -20,6 +20,7 @@ export const profileSchema = z.object({
   romanizedName: z.string().min(1),
   handle: z.string().min(1),
   status: z.string().min(1),
+  avatarUrl: z.string().optional(),
   headline: z.string().min(1),
   summaryLead: z.string().min(1),
   summary: z.array(z.string()),

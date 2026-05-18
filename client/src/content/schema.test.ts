@@ -80,6 +80,38 @@ describe("validatePortfolioContent", () => {
 
     expect(result.projects[0].slug).toBe("aerospace-rag");
     expect(result.notes[0].relatedProjects).toEqual(["aerospace-rag"]);
+    expect(result.profile.avatarUrl).toBeUndefined();
+  });
+
+  it("accepts an editable profile avatar URL", () => {
+    const result = validatePortfolioContent({
+      site: {
+        title: "김유석 | AI 연구 엔지니어 포트폴리오",
+        description: "LLM 시스템과 RAG 아키텍처를 다루는 포트폴리오",
+        url: "https://namuori.net",
+        navigation: [{ id: "about", label: "소개", icon: "user" }],
+        images: { heroTree: "x", ragDiagram: "x", dotPattern: "x" },
+      },
+      profile: {
+        name: "김유석",
+        romanizedName: "KIM YUSEOK",
+        handle: "NAMUORI00",
+        status: "구직 중",
+        avatarUrl: "https://github.com/NAMUORI00.png",
+        headline: "AI 연구 · 엔지니어 지망",
+        summaryLead: "효율적이고 확장 가능한 시스템을 구축하는 소프트웨어 엔지니어입니다.",
+        summary: [],
+        contacts: [],
+      },
+      education: [],
+      research: [],
+      projects: [],
+      skills: [],
+      starred: [],
+      notes: [],
+    });
+
+    expect(result.profile.avatarUrl).toBe("https://github.com/NAMUORI00.png");
   });
 
   it("rejects duplicate slugs", () => {

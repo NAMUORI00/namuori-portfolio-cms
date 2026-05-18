@@ -8,7 +8,7 @@ import {
   serializeProject,
   serializeResearch,
 } from "./adminContent";
-import type { NoteEntry, ProjectEntry, ResearchEntry } from "@/content";
+import type { NoteEntry, ProfileContent, ProjectEntry, ResearchEntry } from "@/content";
 
 const project: ProjectEntry = {
   slug: "aerospace-rag",
@@ -47,6 +47,18 @@ const note: NoteEntry = {
   body: "## 평가\n\n본문",
 };
 
+const profile: ProfileContent = {
+  name: "김유석",
+  romanizedName: "KIM YUSEOK",
+  handle: "NAMUORI00",
+  status: "구직 중",
+  avatarUrl: "https://github.com/NAMUORI00.png",
+  headline: "AI 연구 · 엔지니어 지망",
+  summaryLead: "효율적이고 확장 가능한 시스템을 구축하는 소프트웨어 엔지니어입니다.",
+  summary: ["본문"],
+  contacts: [],
+};
+
 describe("admin content helpers", () => {
   it("creates stable draft branch names", () => {
     expect(projectBranchName("aerospace-rag")).toBe("draft/project-aerospace-rag");
@@ -74,5 +86,16 @@ describe("admin content helpers", () => {
         content: expect.stringContaining("slug: aerospace-rag"),
       }),
     ]);
+  });
+
+  it("includes profile status and avatar URL in profile saves", () => {
+    const payload = buildSavePayload({ kind: "profile", value: profile });
+
+    expect(payload.branch).toBe("draft/profile");
+    expect(payload.files[0]).toEqual({
+      path: "content/profile.json",
+      content: expect.stringContaining('"status": "구직 중"'),
+    });
+    expect(payload.files[0].content).toContain('"avatarUrl": "https://github.com/NAMUORI00.png"');
   });
 });

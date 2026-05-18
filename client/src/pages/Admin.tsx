@@ -220,6 +220,8 @@ export default function Admin() {
         <div className="admin-grid">
           <Field disabled={!canEdit} label="Name" value={profile.name} onChange={(name) => setProfile({ ...profile, name })} />
           <Field disabled={!canEdit} label="Handle" value={profile.handle} onChange={(handle) => setProfile({ ...profile, handle })} />
+          <Field disabled={!canEdit} label="Status" value={profile.status} onChange={(status) => setProfile({ ...profile, status })} />
+          <Field disabled={!canEdit} label="Avatar URL" value={profile.avatarUrl ?? ""} onChange={(avatarUrl) => setProfile({ ...profile, avatarUrl })} />
           <TextArea disabled={!canEdit} label="Headline" value={profile.headline} onChange={(headline) => setProfile({ ...profile, headline })} rows={3} />
           <TextArea disabled={!canEdit} label="Lead" value={profile.summaryLead} onChange={(summaryLead) => setProfile({ ...profile, summaryLead })} rows={4} />
           <TextArea disabled={!canEdit} label="Summary paragraphs" value={profile.summary.join("\n\n")} onChange={(value) => setProfile({ ...profile, summary: value.split(/\n\s*\n/).filter(Boolean) })} rows={8} />

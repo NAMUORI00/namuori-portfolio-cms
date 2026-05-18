@@ -19,8 +19,9 @@
  */
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
-import { portfolioContent } from "@/content";
+import { getProfileAvatarUrl, portfolioContent } from "@/content";
 import { DARK, FONT_MONO, FONT_SANS, FONT_SERIF, LIGHT, type PortfolioTheme } from "@/content/theme";
+import { scrollTopForElement } from "@/lib/scroll";
 
 const IMG = portfolioContent.site.images;
 const NAV_ITEMS = portfolioContent.site.navigation;
@@ -30,6 +31,7 @@ const PROJECTS = portfolioContent.projects.filter((item) => item.status === "pub
 const SKILL_GROUPS = portfolioContent.skills;
 const STARRED = portfolioContent.starred;
 const PROFILE = portfolioContent.profile;
+const PROFILE_AVATAR = getProfileAvatarUrl(PROFILE);
 
 /* ── SVG 아이콘 컴포넌트 ── */
 function NavIcon({ type, color, size = 13 }: { type: string; color: string; size?: number }) {
@@ -293,7 +295,13 @@ export default function Home() {
     const el = document.getElementById(id);
     const container = document.getElementById("scroll-area");
     if (el && container) {
-      container.scrollTo({ top: el.offsetTop - 32, behavior: "smooth" });
+      const top = scrollTopForElement({
+        containerTop: container.getBoundingClientRect().top,
+        elementTop: el.getBoundingClientRect().top,
+        scrollTop: container.scrollTop,
+        offset: 32,
+      });
+      container.scrollTo({ top, behavior: "smooth" });
     }
     setMobileMenuOpen(false);
   }, []);
@@ -343,6 +351,18 @@ export default function Home() {
       {/* ── 모바일 드로어 ── */}
       <div className={`mobile-drawer${mobileMenuOpen ? " open" : ""}`}
         style={{ background: T.sidebarBg, borderRight: `1px solid ${T.border}` }}>
+        <img
+          src={PROFILE_AVATAR}
+          alt={`${PROFILE.name} 프로필 사진`}
+          style={{
+            width: "64px",
+            height: "64px",
+            borderRadius: "50%",
+            objectFit: "cover",
+            border: `1px solid ${T.border}`,
+            marginBottom: "0.9rem",
+          }}
+        />
         <div style={{ fontFamily: FONT_SANS, fontSize: "1.1rem", fontWeight: 700, color: T.text, marginBottom: "0.25rem" }}>
           {PROFILE.name}
         </div>
@@ -381,7 +401,7 @@ export default function Home() {
       <aside
         id="sidebar"
         style={{
-          width: "260px",
+          width: "clamp(248px, 22vw, 340px)",
           flexShrink: 0,
           height: "100dvh",
           overflowY: "auto",
@@ -389,15 +409,29 @@ export default function Home() {
           background: T.sidebarBg,
           display: "flex",
           flexDirection: "column",
-          padding: "2.5rem 1.75rem",
+          padding: "clamp(2rem, 3vw, 3rem) clamp(1.5rem, 2.4vw, 2.25rem)",
           transition: "background 0.25s, border-color 0.25s",
         }}
       >
         {/* 이름 + 직함 */}
         <div style={{ marginBottom: "2rem" }}>
+          <img
+            src={PROFILE_AVATAR}
+            alt={`${PROFILE.name} 프로필 사진`}
+            style={{
+              width: "clamp(72px, 7vw, 104px)",
+              height: "clamp(72px, 7vw, 104px)",
+              borderRadius: "50%",
+              objectFit: "cover",
+              border: `1px solid ${T.border}`,
+              background: T.surface,
+              marginBottom: "1rem",
+              filter: theme === "dark" ? "saturate(0.9) brightness(0.92)" : "saturate(0.95)",
+            }}
+          />
           <div style={{
             fontFamily: FONT_SANS,
-            fontSize: "1.35rem",
+            fontSize: "clamp(1.3rem, 1.7vw, 1.7rem)",
             fontWeight: 700,
             color: T.text,
             lineHeight: 1.2,
@@ -407,7 +441,7 @@ export default function Home() {
           </div>
           <div style={{
             fontFamily: FONT_MONO,
-            fontSize: "0.65rem",
+            fontSize: "clamp(0.62rem, 0.72vw, 0.74rem)",
             color: T.muted,
             letterSpacing: "0.06em",
             marginBottom: "0.75rem",
@@ -424,11 +458,12 @@ export default function Home() {
             padding: "3px 9px",
             borderRadius: "3px",
             marginBottom: "0.75rem",
+            maxWidth: "100%",
           }}>
             <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: T.green, flexShrink: 0 }} />
-            <span style={{ fontFamily: FONT_MONO, fontSize: "0.62rem", color: T.green }}>{PROFILE.status}</span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: "clamp(0.62rem, 0.7vw, 0.72rem)", color: T.green }}>{PROFILE.status}</span>
           </div>
-           <div style={{ fontFamily: FONT_SANS, fontSize: "0.75rem", color: T.sub, lineHeight: 1.7, wordBreak: "keep-all" }}>
+           <div style={{ fontFamily: FONT_SANS, fontSize: "clamp(0.75rem, 0.86vw, 0.88rem)", color: T.sub, lineHeight: 1.7, wordBreak: "keep-all" }}>
             {PROFILE.headline.split("\n").map((line) => (
               <span key={line}>{line}<br /></span>
             ))}
@@ -451,7 +486,7 @@ export default function Home() {
                   textAlign: "left",
                   padding: "0.4rem 0",
                   fontFamily: FONT_SANS,
-                  fontSize: "0.82rem",
+                  fontSize: "clamp(0.82rem, 0.92vw, 0.95rem)",
                   color: isActive ? T.green : T.muted,
                   fontWeight: isActive ? 600 : 400,
                   transition: "color 0.2s",
@@ -577,7 +612,11 @@ export default function Home() {
       >
         <div
           className="scroll-inner"
-          style={{ maxWidth: "720px", padding: "3rem 3.5rem 4rem" }}
+          style={{
+            width: "100%",
+            maxWidth: "clamp(720px, 68vw, 1080px)",
+            padding: "clamp(2.5rem, 5vw, 5rem) clamp(2.25rem, 5vw, 4.5rem) clamp(4rem, 6vw, 6rem)",
+          }}
         >
 
           {/* ── 소개 ── */}

@@ -29,6 +29,7 @@ export interface ProfileContent {
   romanizedName: string;
   handle: string;
   status: string;
+  avatarUrl?: string;
   headline: string;
   summaryLead: string;
   summary: string[];

@@ -96,6 +96,8 @@ export const portfolioContent = validatePortfolioContent({
   notes: [ragEvaluationNote].map(parseNote),
 });
 
+export { getProfileAvatarUrl } from "./profile";
+
 export type {
   EducationEntry,
   NoteEntry,
