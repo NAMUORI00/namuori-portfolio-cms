@@ -8,6 +8,8 @@ export interface PortfolioTheme {
   green: string;
   greenLight: string;
   greenBg: string;
+  red: string;
+  redBg: string;
   sidebarBg: string;
 }
 
@@ -26,6 +28,8 @@ export const LIGHT: PortfolioTheme = {
   green: "#275f47",
   greenLight: "#3f8a65",
   greenBg: "#e7f1ea",
+  red: "#8a3434",
+  redBg: "#f4e5e5",
   sidebarBg: "#ffffff",
 };
 
@@ -39,6 +43,8 @@ export const DARK: PortfolioTheme = {
   green: "#74c69d",
   greenLight: "#95d8b4",
   greenBg: "#1f3328",
+  red: "#ff9a9a",
+  redBg: "#3a2424",
   sidebarBg: "#20251f",
 };
 

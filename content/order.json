@@ -1,0 +1,20 @@
+{
+  "research": [
+    "rag",
+    "edge-llm",
+    "audio-voice",
+    "agentic-workflow"
+  ],
+  "projects": [
+    "aerospace-rag",
+    "llm-rag-research",
+    "cross-review-bridge",
+    "music-source-separation",
+    "mediamtx-installer",
+    "introduce-cv-page",
+    "spring-community-board"
+  ],
+  "notes": [
+    "rag-evaluation"
+  ]
+}

@@ -1,6 +1,7 @@
 import { serializeFrontmatter } from "@/content/markdown";
 import type {
   EducationEntry,
+  ContentOrder,
   NoteEntry,
   ProfileContent,
   ProjectEntry,
@@ -25,9 +26,9 @@ export type SaveTarget =
   | { kind: "education"; value: EducationEntry[] }
   | { kind: "skills"; value: SkillGroup[] }
   | { kind: "starred"; value: StarredRepo[] }
-  | { kind: "project"; value: ProjectEntry }
-  | { kind: "research"; value: ResearchEntry }
-  | { kind: "note"; value: NoteEntry };
+  | { kind: "project"; value: ProjectEntry; order?: ContentOrder }
+  | { kind: "research"; value: ResearchEntry; order?: ContentOrder }
+  | { kind: "note"; value: NoteEntry; order?: ContentOrder };
 
 function cleanSlug(slug: string): string {
   return slug
@@ -51,6 +52,10 @@ export function noteBranchName(slug: string): string {
 
 function jsonFile(path: string, value: unknown): SaveFile {
   return { path, content: `${JSON.stringify(value, null, 2)}\n` };
+}
+
+function orderFile(order?: ContentOrder): SaveFile[] {
+  return order ? [jsonFile("content/order.json", order)] : [];
 }
 
 export function serializeProject(project: ProjectEntry): SaveFile {
@@ -144,19 +149,19 @@ export function buildSavePayload(target: SaveTarget): SavePayload {
     return {
       branch: projectBranchName(target.value.slug),
       message: `Update project: ${target.value.slug}`,
-      files: [serializeProject(target.value)],
+      files: [serializeProject(target.value), ...orderFile(target.order)],
     };
   }
   if (target.kind === "research") {
     return {
       branch: researchBranchName(target.value.slug),
       message: `Update research: ${target.value.slug}`,
-      files: [serializeResearch(target.value)],
+      files: [serializeResearch(target.value), ...orderFile(target.order)],
     };
   }
   return {
     branch: noteBranchName(target.value.slug),
     message: `Update note: ${target.value.slug}`,
-    files: [serializeNote(target.value)],
+    files: [serializeNote(target.value), ...orderFile(target.order)],
   };
 }

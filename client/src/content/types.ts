@@ -92,6 +92,12 @@ export interface NoteEntry {
   body: string;
 }
 
+export interface ContentOrder {
+  research: string[];
+  projects: string[];
+  notes: string[];
+}
+
 export interface PortfolioContent {
   site: SiteContent;
   profile: ProfileContent;

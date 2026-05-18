@@ -8,7 +8,7 @@ import {
   serializeProject,
   serializeResearch,
 } from "./adminContent";
-import type { NoteEntry, ProfileContent, ProjectEntry, ResearchEntry } from "@/content";
+import type { ContentOrder, NoteEntry, ProfileContent, ProjectEntry, ResearchEntry } from "@/content";
 
 const project: ProjectEntry = {
   slug: "aerospace-rag",
@@ -59,6 +59,12 @@ const profile: ProfileContent = {
   contacts: [],
 };
 
+const order: ContentOrder = {
+  research: ["rag"],
+  projects: ["aerospace-rag"],
+  notes: ["rag-evaluation"],
+};
+
 describe("admin content helpers", () => {
   it("creates stable draft branch names", () => {
     expect(projectBranchName("aerospace-rag")).toBe("draft/project-aerospace-rag");
@@ -76,7 +82,7 @@ describe("admin content helpers", () => {
   });
 
   it("builds save payloads for GitHub API", () => {
-    const payload = buildSavePayload({ kind: "project", value: project });
+    const payload = buildSavePayload({ kind: "project", value: project, order });
 
     expect(payload.branch).toBe("draft/project-aerospace-rag");
     expect(payload.message).toBe("Update project: aerospace-rag");
@@ -85,6 +91,10 @@ describe("admin content helpers", () => {
         path: "content/projects/aerospace-rag.mdx",
         content: expect.stringContaining("slug: aerospace-rag"),
       }),
+      {
+        path: "content/order.json",
+        content: `${JSON.stringify(order, null, 2)}\n`,
+      },
     ]);
   });
 

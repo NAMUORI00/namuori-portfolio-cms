@@ -3,21 +3,14 @@ import profile from "@content/profile.json";
 import education from "@content/education.json";
 import skills from "@content/skills.json";
 import starred from "@content/starred.json";
-import ragResearch from "@content/research/rag.mdx?raw";
-import edgeLlmResearch from "@content/research/edge-llm.mdx?raw";
-import audioVoiceResearch from "@content/research/audio-voice.mdx?raw";
-import agenticWorkflowResearch from "@content/research/agentic-workflow.mdx?raw";
-import aerospaceRagProject from "@content/projects/aerospace-rag.mdx?raw";
-import llmRagResearchProject from "@content/projects/llm-rag-research.mdx?raw";
-import crossReviewBridgeProject from "@content/projects/cross-review-bridge.mdx?raw";
-import musicSourceSeparationProject from "@content/projects/music-source-separation.mdx?raw";
-import mediamtxInstallerProject from "@content/projects/mediamtx-installer.mdx?raw";
-import introduceCvPageProject from "@content/projects/introduce-cv-page.mdx?raw";
-import springCommunityBoardProject from "@content/projects/spring-community-board.mdx?raw";
-import ragEvaluationNote from "@content/notes/rag-evaluation.mdx?raw";
+import order from "@content/order.json";
 import { parseFrontmatter } from "./markdown";
 import { validatePortfolioContent } from "./schema";
 import type { NoteEntry, ProjectEntry, ResearchEntry } from "./types";
+
+const researchModules = import.meta.glob<string>("@content/research/*.mdx", { eager: true, import: "default", query: "?raw" });
+const projectModules = import.meta.glob<string>("@content/projects/*.mdx", { eager: true, import: "default", query: "?raw" });
+const noteModules = import.meta.glob<string>("@content/notes/*.mdx", { eager: true, import: "default", query: "?raw" });
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map(String) : [];
@@ -77,33 +70,43 @@ function parseNote(source: string): NoteEntry {
   };
 }
 
+function orderedBySlug<T extends { slug: string }>(items: T[], preferredOrder: string[]): T[] {
+  const order = new Map(preferredOrder.map((slug, index) => [slug, index]));
+  return [...items].sort((a, b) => {
+    const left = order.get(a.slug) ?? Number.MAX_SAFE_INTEGER;
+    const right = order.get(b.slug) ?? Number.MAX_SAFE_INTEGER;
+    if (left !== right) return left - right;
+    return a.slug.localeCompare(b.slug);
+  });
+}
+
+function moduleSources(modules: Record<string, string>): string[] {
+  return Object.entries(modules)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([, source]) => source);
+}
+
 export const portfolioContent = validatePortfolioContent({
   site,
   profile,
   education,
-  research: [ragResearch, edgeLlmResearch, audioVoiceResearch, agenticWorkflowResearch].map(parseResearch),
-  projects: [
-    aerospaceRagProject,
-    llmRagResearchProject,
-    crossReviewBridgeProject,
-    musicSourceSeparationProject,
-    mediamtxInstallerProject,
-    introduceCvPageProject,
-    springCommunityBoardProject,
-  ].map(parseProject),
+  research: orderedBySlug(moduleSources(researchModules).map(parseResearch), order.research),
+  projects: orderedBySlug(moduleSources(projectModules).map(parseProject), order.projects),
   skills,
   starred,
-  notes: [ragEvaluationNote].map(parseNote),
+  notes: orderedBySlug(moduleSources(noteModules).map(parseNote), order.notes),
 });
 
 export { getProfileAvatarUrl } from "./profile";
 
 export type {
   EducationEntry,
+  ContentOrder,
   NoteEntry,
   PortfolioContent,
   ProfileContent,
   ProjectEntry,
+  PublicationStatus,
   ResearchEntry,
   SkillGroup,
   StarredRepo,
