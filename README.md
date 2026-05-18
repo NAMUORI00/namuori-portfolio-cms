@@ -2,6 +2,13 @@
 
 GitHub draft branches and Cloudflare Pages preview deployments power this portfolio. The public site renders from `content/`, while `/admin` edits that content and publishes changes as pull requests.
 
+## Production
+
+- Site: `https://namuori-portfolio-cms.pages.dev/`
+- Admin: `https://namuori-portfolio-cms.pages.dev/admin`
+- Repository: `https://github.com/NAMUORI00/namuori-portfolio-cms`
+- Cloudflare Pages project: `namuori-portfolio-cms`
+
 ## Local Development
 
 ```bash
