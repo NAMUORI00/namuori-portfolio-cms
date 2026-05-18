@@ -96,4 +96,13 @@ export const portfolioContent = validatePortfolioContent({
   notes: [ragEvaluationNote].map(parseNote),
 });
 
-export type { NoteEntry, PortfolioContent, ProjectEntry, ResearchEntry } from "./types";
+export type {
+  EducationEntry,
+  NoteEntry,
+  PortfolioContent,
+  ProfileContent,
+  ProjectEntry,
+  ResearchEntry,
+  SkillGroup,
+  StarredRepo,
+} from "./types";
