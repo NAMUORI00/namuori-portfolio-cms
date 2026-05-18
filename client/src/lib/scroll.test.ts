@@ -51,4 +51,18 @@ describe("activeSectionForAnchor", () => {
       ),
     ).toBe("education");
   });
+
+  it("activates the final section when the scroll area is at the end", () => {
+    expect(
+      activeSectionForAnchor(
+        [
+          { id: "projects", top: -1054.953125 },
+          { id: "skills", top: 47.515625 },
+          { id: "interests", top: 295.640625 },
+        ],
+        96,
+        true,
+      ),
+    ).toBe("interests");
+  });
 });

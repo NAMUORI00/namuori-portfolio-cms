@@ -34,7 +34,8 @@ const STARRED = portfolioContent.starred;
 const PROFILE = portfolioContent.profile;
 const PROFILE_AVATAR = getProfileAvatarUrl(PROFILE);
 const ACTIVE_SECTION_ANCHOR = 96;
-const SCROLL_END_PADDING = "max(clamp(4rem, 6vw, 6rem), 48vh)";
+const ACTIVE_SCROLL_END_TOLERANCE = 4;
+const SCROLL_END_PADDING = "max(clamp(4rem, 6vw, 6rem), calc(100dvh - 6rem))";
 
 /* ── SVG 아이콘 컴포넌트 ── */
 function NavIcon({ type, color, size = 13 }: { type: string; color: string; size?: number }) {
@@ -154,7 +155,8 @@ function useActiveSection(ids: string[]) {
         const el = document.getElementById(id);
         return el ? [{ id, top: el.getBoundingClientRect().top - containerTop }] : [];
       });
-      const next = activeSectionForAnchor(sections, ACTIVE_SECTION_ANCHOR);
+      const isAtEnd = container.scrollTop + container.clientHeight >= container.scrollHeight - ACTIVE_SCROLL_END_TOLERANCE;
+      const next = activeSectionForAnchor(sections, ACTIVE_SECTION_ANCHOR, isAtEnd);
       if (next) setActive(next);
     };
     const scheduleUpdate = () => {

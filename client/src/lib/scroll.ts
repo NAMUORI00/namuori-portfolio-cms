@@ -14,7 +14,9 @@ export function scrollTopForElement({ containerTop, elementTop, scrollTop, offse
   return Math.max(0, scrollTop + elementTop - containerTop - offset);
 }
 
-export function activeSectionForAnchor(sections: SectionAnchor[], anchorTop: number): string | undefined {
+export function activeSectionForAnchor(sections: SectionAnchor[], anchorTop: number, isAtEnd = false): string | undefined {
+  if (isAtEnd) return sections.at(-1)?.id;
+
   let active = sections[0]?.id;
   for (const section of sections) {
     if (section.top > anchorTop) break;
