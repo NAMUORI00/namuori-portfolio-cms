@@ -4,15 +4,11 @@ import { portfolioContent, type EducationEntry, type NoteEntry, type ProfileCont
 import { toMarkdownHtml } from "@/content/markdown";
 import { DARK, FONT_MONO, FONT_SANS, LIGHT } from "@/content/theme";
 import { useTheme } from "@/contexts/ThemeContext";
+import { adminAccessState, type AdminSessionInfo } from "@/lib/adminAccess";
 import { buildSavePayload, type SavePayload, type SaveTarget } from "@/lib/adminContent";
 
 type SectionKey = "profile" | "education" | "research" | "projects" | "skills" | "starred" | "notes";
 type EditorMode = "write" | "source" | "preview";
-
-interface SessionInfo {
-  authenticated: boolean;
-  login?: string;
-}
 
 const SECTIONS: Array<{ key: SectionKey; label: string }> = [
   { key: "profile", label: "Profile" },
@@ -120,7 +116,7 @@ export default function Admin() {
   const { theme, toggleTheme } = useTheme();
   const T = theme === "dark" ? DARK : LIGHT;
   const localPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get("demo") === "1";
-  const [session, setSession] = useState<SessionInfo | null>(null);
+  const [session, setSession] = useState<AdminSessionInfo | null>(null);
   const [active, setActive] = useState<SectionKey>("profile");
   const [profile, setProfile] = useState<ProfileContent>(portfolioContent.profile);
   const [education, setEducation] = useState<EducationEntry[]>(portfolioContent.education);
@@ -135,7 +131,8 @@ export default function Admin() {
   const [mode, setMode] = useState<EditorMode>("write");
   const [status, setStatus] = useState("변경사항을 저장하면 draft 브랜치 커밋으로 전송됩니다.");
 
-  const canEdit = Boolean(session?.authenticated || localPreview);
+  const access = adminAccessState(session, localPreview);
+  const canEdit = access === "granted";
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -324,6 +321,45 @@ export default function Admin() {
       </div>
     );
   }
+
+  function renderAccessGate() {
+    return (
+      <main style={{ minHeight: "100dvh", background: T.bg, color: T.text, fontFamily: FONT_SANS }}>
+        <div className="admin-login-shell">
+          <section className="admin-login-card" style={{ background: T.surface, borderColor: T.border }}>
+            <Link href="/" className="admin-back" style={{ color: T.green }}>← Portfolio</Link>
+            <span className="admin-kicker">admin access</span>
+            <h1>{access === "loading" ? "세션 확인 중" : "관리자 로그인이 필요합니다"}</h1>
+            <p>
+              {access === "loading"
+                ? "관리자 세션을 확인하고 있습니다."
+                : "포트폴리오 콘텐츠를 작성하거나 수정하려면 허용된 GitHub 계정으로 로그인하세요."}
+            </p>
+            {access === "locked" && (
+              <div className="admin-login-actions">
+                <a href="/api/auth/login">GitHub로 로그인</a>
+              </div>
+            )}
+          </section>
+        </div>
+        <style>{`
+          .admin-login-shell { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+          .admin-login-card { width: min(100%, 440px); border: 1px solid; border-radius: 6px; padding: 28px; }
+          .admin-login-card h1 { margin: 18px 0 10px; font-size: 1.5rem; }
+          .admin-login-card p { color: ${T.sub}; line-height: 1.7; margin: 0; }
+          .admin-login-actions { display: flex; gap: 8px; margin-top: 22px; }
+          .admin-login-actions a {
+            border: 1px solid ${T.green}; background: ${T.greenBg}; color: ${T.green};
+            border-radius: 4px; padding: 9px 12px; font-family: ${FONT_MONO}; text-decoration: none;
+          }
+          .admin-back { font-family: ${FONT_MONO}; font-size: .75rem; text-decoration: none; }
+          .admin-kicker { display: inline-block; color: ${T.green}; font-family: ${FONT_MONO}; font-size: .72rem; text-transform: uppercase; margin-top: 20px; }
+        `}</style>
+      </main>
+    );
+  }
+
+  if (access !== "granted") return renderAccessGate();
 
   return (
     <main style={{ minHeight: "100dvh", background: T.bg, color: T.text, fontFamily: FONT_SANS }}>
