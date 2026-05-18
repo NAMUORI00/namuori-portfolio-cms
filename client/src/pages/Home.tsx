@@ -187,9 +187,9 @@ function FadeSection({ children, style }: { children: React.ReactNode; style?: R
     <section
       ref={ref as React.RefObject<HTMLElement>}
       style={{
-        opacity: 0,
-        transform: "translateY(18px)",
-        transition: "opacity 0.5s ease, transform 0.5s ease",
+        opacity: 1,
+        transform: "translateY(0)",
+        transition: "transform 0.25s ease",
         marginBottom: "3.5rem",
         ...style,
       }}
