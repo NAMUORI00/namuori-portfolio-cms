@@ -34,6 +34,7 @@ const STARRED = portfolioContent.starred;
 const PROFILE = portfolioContent.profile;
 const PROFILE_AVATAR = getProfileAvatarUrl(PROFILE);
 const ACTIVE_SECTION_ANCHOR = 96;
+const SCROLL_END_PADDING = "max(clamp(4rem, 6vw, 6rem), 48vh)";
 
 /* ── SVG 아이콘 컴포넌트 ── */
 function NavIcon({ type, color, size = 13 }: { type: string; color: string; size?: number }) {
@@ -627,7 +628,7 @@ export default function Home() {
           style={{
             width: "100%",
             maxWidth: "clamp(720px, 68vw, 1080px)",
-            padding: "clamp(2.5rem, 5vw, 5rem) clamp(2.25rem, 5vw, 4.5rem) clamp(4rem, 6vw, 6rem)",
+            padding: `clamp(2.5rem, 5vw, 5rem) clamp(2.25rem, 5vw, 4.5rem) ${SCROLL_END_PADDING}`,
           }}
         >
 
@@ -807,8 +808,7 @@ export default function Home() {
                         alt="RAG 시스템 아키텍처 다이어그램"
                         style={{
                           width: "100%",
-                          height: "auto",
-                          maxHeight: "180px",
+                          height: "clamp(140px, 24vw, 180px)",
                           objectFit: "cover",
                           objectPosition: "center",
                           display: "block",
