@@ -22,6 +22,15 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function hashFraction(value: string, salt = ""): number {
+  let hash = 2166136261;
+  for (const char of `${salt}:${value}`) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) % 10000) / 10000;
+}
+
 function ringForKind(kind: KnowledgeGraphNode["kind"]): number {
   if (kind === "profile") return 0;
   if (kind === "project" || kind === "research") return 0.48;
@@ -44,29 +53,28 @@ function nodeRadius(node: KnowledgeGraphNode): number {
   return 3.5 + Math.min(4, node.weight);
 }
 
+function linkDistance(link: Pick<KnowledgeGraphLink, "kind" | "weight">): number {
+  if (link.kind === "related") return 48;
+  if (link.kind === "tag" || link.kind === "term") return Math.max(42, 76 - link.weight * 10);
+  if (link.kind === "profile") return 76;
+  if (link.kind === "skill") return 92;
+  if (link.kind === "repo") return 108;
+  return 78;
+}
+
 export function layoutKnowledgeGraph(graph: KnowledgeGraphData, width: number, height: number): PositionedKnowledgeGraph {
   const centerX = Math.round(width / 2);
   const centerY = Math.round(height / 2);
-  const padding = 16;
+  const padding = 34;
+  const softPadding = padding + 10;
   const maxRadius = Math.max(32, Math.min(width, height) / 2 - padding);
-  const groups = new Map<KnowledgeGraphNode["kind"], KnowledgeGraphNode[]>();
-
-  for (const node of graph.nodes) {
-    const bucket = groups.get(node.kind) ?? [];
-    bucket.push(node);
-    groups.set(node.kind, bucket);
-  }
-
   const positioned = graph.nodes.map((node) => {
     if (node.kind === "profile") {
       return { ...node, x: centerX, y: centerY, radius: nodeRadius(node) };
     }
 
-    const bucket = groups.get(node.kind) ?? [node];
-    const index = Math.max(0, bucket.findIndex((item) => item.id === node.id));
-    const angleStep = (Math.PI * 2) / Math.max(bucket.length, 1);
-    const angle = phaseForKind(node.kind) + angleStep * index;
-    const wave = 1 + (index % 3) * 0.05;
+    const angle = phaseForKind(node.kind) + hashFraction(node.id, "angle") * Math.PI * 2;
+    const wave = 0.86 + hashFraction(node.id, "wave") * 0.26;
     const distance = maxRadius * ringForKind(node.kind) * wave;
     const radius = nodeRadius(node);
 
@@ -85,6 +93,101 @@ export function layoutKnowledgeGraph(graph: KnowledgeGraphData, width: number, h
     if (!source || !target) return [];
     return [{ ...link, sourceId: link.source, targetId: link.target, source, target }];
   });
+
+  const movable = new Set(positioned.filter((node) => node.kind !== "profile").map((node) => node.id));
+  const velocity = new Map(positioned.map((node) => [node.id, { x: 0, y: 0 }]));
+  const iterations = 96;
+
+  for (let iteration = 0; iteration < iterations; iteration += 1) {
+    const alpha = 1 - iteration / iterations;
+
+    for (let i = 0; i < positioned.length; i += 1) {
+      const a = positioned[i];
+      for (let j = i + 1; j < positioned.length; j += 1) {
+        const b = positioned[j];
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let distance = Math.hypot(dx, dy);
+        if (distance < 0.01) {
+          const angle = hashFraction(`${a.id}-${b.id}`, "jitter") * Math.PI * 2;
+          dx = Math.cos(angle);
+          dy = Math.sin(angle);
+          distance = 1;
+        }
+        const minDistance = a.radius + b.radius + 10;
+        const collision = Math.max(0, minDistance - distance);
+        const repel = (18 / Math.max(distance, 12) + collision * 0.1) * alpha;
+        const fx = (dx / distance) * repel;
+        const fy = (dy / distance) * repel;
+        if (movable.has(a.id)) {
+          const av = velocity.get(a.id);
+          if (av) {
+            av.x -= fx;
+            av.y -= fy;
+          }
+        }
+        if (movable.has(b.id)) {
+          const bv = velocity.get(b.id);
+          if (bv) {
+            bv.x += fx;
+            bv.y += fy;
+          }
+        }
+      }
+    }
+
+    for (const link of links) {
+      const source = link.source;
+      const target = link.target;
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const desired = linkDistance(link);
+      const force = (distance - desired) * 0.018 * Math.max(0.8, link.weight) * alpha;
+      const fx = (dx / distance) * force;
+      const fy = (dy / distance) * force;
+      if (movable.has(source.id)) {
+        const sv = velocity.get(source.id);
+        if (sv) {
+          sv.x += fx;
+          sv.y += fy;
+        }
+      }
+      if (movable.has(target.id)) {
+        const tv = velocity.get(target.id);
+        if (tv) {
+          tv.x -= fx;
+          tv.y -= fy;
+        }
+      }
+    }
+
+    for (const node of positioned) {
+      if (!movable.has(node.id)) {
+        node.x = centerX;
+        node.y = centerY;
+        continue;
+      }
+      const v = velocity.get(node.id);
+      if (!v) continue;
+      const centerPull = node.kind === "term" || node.kind === "repo" ? 0.0032 : 0.0042;
+      v.x += (centerX - node.x) * centerPull * alpha;
+      v.y += (centerY - node.y) * centerPull * alpha;
+      if (node.x < softPadding) v.x += (softPadding - node.x) * 0.035 * alpha;
+      if (node.x > width - softPadding) v.x -= (node.x - (width - softPadding)) * 0.035 * alpha;
+      if (node.y < softPadding) v.y += (softPadding - node.y) * 0.035 * alpha;
+      if (node.y > height - softPadding) v.y -= (node.y - (height - softPadding)) * 0.035 * alpha;
+      node.x = clamp(node.x + v.x, padding, width - padding);
+      node.y = clamp(node.y + v.y, padding, height - padding);
+      v.x *= 0.68;
+      v.y *= 0.68;
+    }
+  }
+
+  for (const node of positioned) {
+    node.x = Math.round(node.x);
+    node.y = Math.round(node.y);
+  }
 
   return { nodes: positioned, links };
 }

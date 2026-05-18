@@ -60,11 +60,8 @@ export function KnowledgeGraphRail({
         .map((node) => {
           const id = cssAttr(node.id);
           return `
-            #knowledge-rail svg:has([data-node-id="${id}"]:hover) [data-connects~="${id}"] {
-              stroke-opacity: 0.68;
-            }
-            #knowledge-rail svg:has([data-node-id="${id}"]:hover) [data-connects~="${id}"].knowledge-signal {
-              stroke-opacity: 0.62;
+            #knowledge-rail .knowledge-node-group[data-node-id="${id}"]:hover ~ .knowledge-hover-layer [data-connects~="${id}"] {
+              stroke-opacity: 0.58;
               animation-duration: 1.15s;
             }
           `;
@@ -72,7 +69,7 @@ export function KnowledgeGraphRail({
         .join("\n"),
     [layout.nodes],
   );
-  const topNodes = layout.nodes.filter((node) => node.kind !== "profile").slice(0, 5);
+  const topNodes = layout.nodes.filter((node) => node.kind !== "profile").slice(0, 4);
 
   return (
     <aside
@@ -106,47 +103,49 @@ export function KnowledgeGraphRail({
           position: "relative",
           border: `1px solid ${T.border}`,
           borderRadius: "6px",
-          background: T.bg,
+          background: T.surface,
           overflow: "hidden",
           minHeight: "340px",
+          boxShadow: `inset 0 0 36px ${T.green}18`,
         }}
       >
-        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="관심사 노드 그래프" style={{ display: "block", width: "100%", height: "auto" }}>
+        <svg
+          className="knowledge-canvas"
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          aria-hidden="true"
+          focusable="false"
+          style={{ display: "block", width: "100%", height: "auto" }}
+        >
           <defs>
-            <radialGradient id="knowledge-core" cx="50%" cy="50%" r="60%">
-              <stop offset="0%" stopColor={T.greenLight} stopOpacity="0.35" />
-              <stop offset="100%" stopColor={T.green} stopOpacity="0" />
+            <radialGradient id="knowledge-vignette" cx="50%" cy="48%" r="64%">
+              <stop offset="0%" stopColor={T.greenLight} stopOpacity="0.16" />
+              <stop offset="58%" stopColor={T.green} stopOpacity="0.045" />
+              <stop offset="100%" stopColor={T.bg} stopOpacity="0" />
             </radialGradient>
+            <pattern id="knowledge-grid" width="18" height="18" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="0.75" fill={T.muted} opacity="0.14" />
+            </pattern>
           </defs>
-          <rect x="0" y="0" width={WIDTH} height={HEIGHT} fill="transparent" />
-          <circle cx={WIDTH / 2} cy={HEIGHT / 2} r="92" fill="url(#knowledge-core)" />
+          <rect x="0" y="0" width={WIDTH} height={HEIGHT} fill={T.bg} />
+          <rect x="0" y="0" width={WIDTH} height={HEIGHT} fill="url(#knowledge-grid)" />
+          <circle cx={WIDTH / 2} cy={HEIGHT / 2} r="118" fill="url(#knowledge-vignette)" />
           {layout.links.map((link) => {
-            const isLit = !focusNode || connected.has(link.sourceId) || connected.has(link.targetId);
+            const isLit = !focusNode || link.sourceId === focusNode.id || link.targetId === focusNode.id;
+            const edgeState = !focusNode ? "idle" : isLit ? "active" : "dim";
             const path = curvedKnowledgeLinkPath(link);
             return (
               <g key={`${link.sourceId}-${link.targetId}-${link.kind}`}>
                 <path
                   className="knowledge-edge knowledge-edge-base"
                   data-connects={`${link.sourceId} ${link.targetId}`}
+                  data-edge-state={edgeState}
                   d={path}
                   fill="none"
-                  stroke={link.kind === "related" ? T.green : T.border}
-                  strokeWidth={Math.max(0.6, Math.min(2.4, link.weight / 1.25))}
-                  strokeOpacity={isLit ? 0.5 : 0.1}
+                  stroke={link.kind === "related" ? T.greenLight : T.muted}
+                  strokeWidth={isLit ? Math.max(0.65, Math.min(1.55, link.weight / 1.8)) : 0.55}
+                  strokeOpacity={edgeState === "active" ? (hoveredNode ? 0.58 : 0.34) : 0.09}
                   strokeLinecap="round"
                 />
-                {isLit && (
-                  <path
-                    className="knowledge-edge knowledge-signal"
-                    data-connects={`${link.sourceId} ${link.targetId}`}
-                    d={path}
-                    fill="none"
-                    stroke={T.greenLight}
-                    strokeWidth={Math.max(0.7, Math.min(1.8, link.weight / 1.7))}
-                    strokeOpacity={link.kind === "related" ? 0.5 : 0.28}
-                    strokeLinecap="round"
-                  />
-                )}
               </g>
             );
           })}
@@ -154,17 +153,19 @@ export function KnowledgeGraphRail({
             const color = nodeColor(node, T);
             const isActive = node.section === active || node.id === hovered;
             const isLit = !focusNode || connected.has(node.id);
+            const isHovered = node.id === hovered;
             return (
               <g
                 className="knowledge-node-group"
                 key={node.id}
                 data-node-id={node.id}
+                data-node-state={isHovered ? "hovered" : isLit ? "connected" : "dim"}
                 aria-label={`${node.label} ${kindLabel(node.kind)}`}
                 onPointerEnter={() => setHovered(node.id)}
                 onPointerLeave={() => setHovered(null)}
                 style={{ cursor: "default", outline: "none" }}
               >
-                {(isActive || node.kind === "profile") && (
+                {(isHovered || (!hoveredNode && isActive)) && (
                   <circle
                     className="knowledge-ripple"
                     cx={node.x}
@@ -177,12 +178,12 @@ export function KnowledgeGraphRail({
                   />
                 )}
                 <circle
-                  className={isActive ? "knowledge-halo active" : "knowledge-halo"}
+                  className={isHovered || (!hoveredNode && isActive) ? "knowledge-halo active" : "knowledge-halo"}
                   cx={node.x}
                   cy={node.y}
-                  r={node.radius + (isActive ? 9 : 5)}
+                  r={node.radius + (isActive ? 8 : 4)}
                   fill={color}
-                  opacity={isActive ? 0.2 : 0.08}
+                  opacity={isActive ? 0.18 : 0.045}
                 />
                 <circle
                   className={isLit ? "knowledge-node lit" : "knowledge-node"}
@@ -190,11 +191,11 @@ export function KnowledgeGraphRail({
                   cy={node.y}
                   r={node.radius}
                   fill={color}
-                  opacity={isLit ? 0.92 : 0.24}
+                  opacity={isLit ? (hoveredNode ? 0.86 : 0.72) : 0.2}
                   stroke={isActive ? T.green : T.bg}
-                  strokeWidth={isActive ? 1.7 : 1}
+                  strokeWidth={isActive ? 1.45 : 0.85}
                 />
-                {(node.kind === "profile" || isActive) && (
+                {(node.kind === "profile" || isHovered || (!hoveredNode && isActive)) && (
                   <text
                     x={node.x}
                     y={node.y - node.radius - 7}
@@ -218,21 +219,33 @@ export function KnowledgeGraphRail({
               </g>
             );
           })}
+          <g className="knowledge-hover-layer" pointerEvents="none" aria-hidden="true">
+            {layout.links.map((link) => (
+              <path
+                key={`hover-${link.sourceId}-${link.targetId}-${link.kind}`}
+                className="knowledge-edge knowledge-hover-signal"
+                data-connects={`${link.sourceId} ${link.targetId}`}
+                d={curvedKnowledgeLinkPath(link)}
+                fill="none"
+                stroke={T.greenLight}
+                strokeWidth={Math.max(0.7, Math.min(1.35, link.weight / 2.2))}
+                strokeOpacity="0"
+                strokeLinecap="round"
+              />
+            ))}
+          </g>
         </svg>
         <style>{`
           #knowledge-rail .knowledge-hit {
             cursor: default;
           }
           #knowledge-rail .knowledge-edge {
-            transition: stroke-opacity 160ms ease, stroke-width 160ms ease;
+            transition: stroke-opacity 180ms ease, stroke-width 180ms ease;
           }
           #knowledge-rail .knowledge-node {
             transform-box: fill-box;
             transform-origin: center;
-            transition: opacity 160ms ease, r 160ms ease, stroke 160ms ease;
-          }
-          #knowledge-rail .knowledge-node.lit {
-            animation: nodeBreathe 2.8s ease-in-out infinite;
+            transition: opacity 180ms ease, stroke 180ms ease, transform 180ms ease;
           }
           #knowledge-rail .knowledge-halo {
             transform-box: fill-box;
@@ -247,14 +260,18 @@ export function KnowledgeGraphRail({
             transform-origin: center;
             animation: neuralPulse 2.8s ease-out infinite;
           }
-          #knowledge-rail .knowledge-signal {
-            stroke-dasharray: 3 12;
-            animation: signalFlow 1.9s linear infinite;
+          #knowledge-rail .knowledge-hover-layer {
+            pointer-events: none;
+          }
+          #knowledge-rail .knowledge-hover-signal {
+            stroke-dasharray: 2 10;
+            animation: signalFlow 1.35s linear infinite;
+            transition: stroke-opacity 140ms ease;
           }
           #knowledge-rail .knowledge-node-group:hover .knowledge-node {
             opacity: 0.98;
             stroke: ${T.green};
-            transform: scale(1.18);
+            transform: scale(1.14);
           }
           #knowledge-rail .knowledge-node-group:hover .knowledge-halo {
             opacity: 0.24;
@@ -265,13 +282,9 @@ export function KnowledgeGraphRail({
           }
           ${hoverRules}
           @keyframes neuralPulse {
-            0% { opacity: 0.34; transform: scale(0.86); }
-            70% { opacity: 0.08; transform: scale(1.45); }
-            100% { opacity: 0; transform: scale(1.65); }
-          }
-          @keyframes nodeBreathe {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.14); }
+            0% { opacity: 0.22; transform: scale(0.92); }
+            72% { opacity: 0.05; transform: scale(1.35); }
+            100% { opacity: 0; transform: scale(1.48); }
           }
           @keyframes signalFlow {
             from { stroke-dashoffset: 0; }

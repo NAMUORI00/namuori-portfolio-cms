@@ -20,11 +20,16 @@ describe("KnowledgeGraphRail", () => {
   it("renders the graph as a passive visualization without click controls", () => {
     const html = renderToStaticMarkup(<KnowledgeGraphRail graph={graph} T={LIGHT} active="about" />);
 
-    expect(html).toContain('role="img"');
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).toContain('class="knowledge-canvas"');
     expect(html).toContain('class="knowledge-hit"');
+    expect(html).toContain('class="knowledge-hover-layer"');
     expect(html).toContain('pointer-events="all"');
     expect(html).toContain('data-connects="profile project:a"');
-    expect(html).toContain(':has([data-node-id="profile"]:hover)');
+    expect(html).toContain('data-edge-state="active"');
+    expect(html).toContain('knowledge-node-group[data-node-id="profile"]:hover');
+    expect(html).not.toContain(":has(");
+    expect(html).not.toContain("nodeBreathe");
     expect(html).not.toContain('role="button"');
     expect(html).not.toContain("<button");
     expect(html).not.toContain("tabindex");

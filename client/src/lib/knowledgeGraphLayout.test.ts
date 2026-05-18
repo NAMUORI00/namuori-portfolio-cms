@@ -17,6 +17,13 @@ const graph: KnowledgeGraphData = {
   ],
 };
 
+function distanceBetween(layout: ReturnType<typeof layoutKnowledgeGraph>, leftId: string, rightId: string): number {
+  const left = layout.nodes.find((node) => node.id === leftId);
+  const right = layout.nodes.find((node) => node.id === rightId);
+  if (!left || !right) throw new Error(`Missing node pair ${leftId} ${rightId}`);
+  return Math.hypot(left.x - right.x, left.y - right.y);
+}
+
 describe("layoutKnowledgeGraph", () => {
   it("places the profile node at the center and all other nodes inside the rail", () => {
     const layout = layoutKnowledgeGraph(graph, 260, 340);
@@ -48,5 +55,23 @@ describe("layoutKnowledgeGraph", () => {
     expect(path).toMatch(/^M \d+ \d+ Q /);
     expect(path).toContain("130 170");
     expect(path).not.toContain(" L ");
+  });
+
+  it("pulls linked terms closer than unrelated terms for an Obsidian-like cluster", () => {
+    const clustered: KnowledgeGraphData = {
+      nodes: [
+        { id: "profile", label: "NAMUORI00", kind: "profile", weight: 5 },
+        { id: "project:a", label: "Project A", kind: "project", weight: 3, section: "projects" },
+        { id: "term:unlinked", label: "Unlinked", kind: "term", weight: 2 },
+        { id: "term:linked", label: "Linked", kind: "term", weight: 2 },
+      ],
+      links: [
+        { source: "profile", target: "project:a", kind: "profile", weight: 1 },
+        { source: "project:a", target: "term:linked", kind: "term", weight: 2.4 },
+      ],
+    };
+    const layout = layoutKnowledgeGraph(clustered, 260, 340);
+
+    expect(distanceBetween(layout, "project:a", "term:linked")).toBeLessThan(distanceBetween(layout, "project:a", "term:unlinked"));
   });
 });
