@@ -7,6 +7,20 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { adminAccessState, type AdminSessionInfo } from "@/lib/adminAccess";
 import { buildSavePayload, type SavePayload, type SaveTarget } from "@/lib/adminContent";
 import {
+  clearDirtySection,
+  clearImportApplied,
+  createImportAppliedState,
+  hasDirtySection,
+  isImportApplied,
+  markDirtySection,
+  markImportApplied,
+  saveScopeSummary,
+  sectionActionLabel,
+  sectionLabel,
+  type AdminUxSectionKey,
+  type ImportAppliedState,
+} from "@/lib/adminUx";
+import {
   demoGitHubImportResponse,
   mergeProjectCandidate,
   mergeSkillCandidates,
@@ -32,9 +46,10 @@ import {
   updateItem,
 } from "@/lib/adminItems";
 
-type SectionKey = "profile" | "education" | "research" | "projects" | "skills" | "starred" | "notes";
+type SectionKey = AdminUxSectionKey;
 type EditorMode = "write" | "source" | "preview";
 type MoveDirection = "up" | "down";
+type UndoAction = { message: string; onUndo: () => void };
 
 const SECTIONS: Array<{ key: SectionKey; label: string }> = [
   { key: "profile", label: "Profile" },
@@ -228,6 +243,9 @@ export default function Admin() {
   const [importMode, setImportMode] = useState<GitHubImportMode>("profile");
   const [importResult, setImportResult] = useState<GitHubImportResponse | null>(null);
   const [importLoading, setImportLoading] = useState(false);
+  const [dirtySections, setDirtySections] = useState<SectionKey[]>([]);
+  const [appliedImport, setAppliedImport] = useState<ImportAppliedState>(() => createImportAppliedState());
+  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
 
   const access = adminAccessState(session, localPreview);
   const canEdit = access === "granted";
@@ -259,6 +277,36 @@ export default function Admin() {
   }, [active, contentOrder, education, noteIndex, notes, profile, projectIndex, projects, research, researchIndex, skills, starred]);
 
   const savePayload = useMemo<SavePayload>(() => buildSavePayload(target), [target]);
+  const activeDirty = hasDirtySection(dirtySections, active);
+  const dirtySectionLabels = dirtySections.map(sectionLabel).join(", ");
+  const currentScope = saveScopeSummary(active, savePayload.branch);
+
+  function markSectionDirty(section: SectionKey) {
+    setDirtySections((items) => markDirtySection(items, section));
+  }
+
+  function clearSavedSection(section: SectionKey) {
+    setDirtySections((items) => clearDirtySection(items, section));
+    if (section === "projects" || section === "skills" || section === "starred") {
+      setAppliedImport((state) => clearImportApplied(state, section));
+    }
+  }
+
+  function queueUndo(message: string, onUndo: () => void) {
+    setUndoAction({
+      message,
+      onUndo: () => {
+        onUndo();
+        setStatus("변경을 되돌렸습니다. 저장 전 상태를 다시 확인하세요.");
+        setUndoAction(null);
+      },
+    });
+  }
+
+  function updateProfile(next: Partial<ProfileContent>) {
+    setProfile((current) => ({ ...current, ...next }));
+    markSectionDirty("profile");
+  }
 
   async function postJson(path: string, payload: unknown) {
     const response = await fetch(path, {
@@ -281,11 +329,13 @@ export default function Admin() {
     try {
       if (localPreview) {
         setImportResult({ ...demoGitHubImportResponse, source: importSource });
+        setAppliedImport(createImportAppliedState());
         setStatus("로컬 미리보기: GitHub 후보 샘플을 불러왔습니다. Apply 후 저장 흐름을 확인할 수 있습니다.");
         return;
       }
       const result = await postJson("/api/github/import", { source: importSource, mode: importMode });
       setImportResult(result as GitHubImportResponse);
+      setAppliedImport(createImportAppliedState());
       setStatus(`GitHub 후보를 불러왔습니다: Projects ${result.projects?.length ?? 0}, Skills ${result.skills?.length ?? 0}, Starred ${result.starred?.length ?? 0}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "GitHub 후보를 가져오지 못했습니다.");
@@ -301,20 +351,26 @@ export default function Admin() {
       return result.items;
     });
     setActive("projects");
-    setStatus(`프로젝트 후보를 편집 목록에 적용했습니다: ${candidate.name}`);
+    markSectionDirty("projects");
+    setAppliedImport((state) => markImportApplied(state, "projects", [candidate.slug]));
+    setStatus(`프로젝트 후보를 편집 목록에 적용했습니다: ${candidate.name}. 아직 저장 전입니다.`);
   }
 
   function applySkillCandidates(candidates = importResult?.skills ?? []) {
     if (candidates.length === 0) return;
     setSkills((items) => mergeSkillCandidates(items, candidates));
     setActive("skills");
+    markSectionDirty("skills");
+    setAppliedImport((state) => markImportApplied(state, "skills", candidates.map((candidate) => candidate.label)));
     setStatus(`기술 스택 후보 ${candidates.length}개 그룹을 병합했습니다. 저장 전 항목을 검토하세요.`);
   }
 
   function applyStarredCandidate(candidate: StarredRepo) {
     setStarred((items) => mergeStarredCandidates(items, [candidate]));
     setActive("starred");
-    setStatus(`관심 저장소 후보를 적용했습니다: ${candidate.name}`);
+    markSectionDirty("starred");
+    setAppliedImport((state) => markImportApplied(state, "starred", [candidate.name]));
+    setStatus(`관심 저장소 후보를 적용했습니다: ${candidate.name}. 아직 저장 전입니다.`);
   }
 
   function applyAllStarredCandidates() {
@@ -322,7 +378,9 @@ export default function Admin() {
     if (candidates.length === 0) return;
     setStarred((items) => mergeStarredCandidates(items, candidates));
     setActive("starred");
-    setStatus(`관심 저장소 후보를 병합했습니다. 중복 저장소는 유지하지 않았습니다.`);
+    markSectionDirty("starred");
+    setAppliedImport((state) => markImportApplied(state, "starred", candidates.map((candidate) => candidate.name)));
+    setStatus(`관심 저장소 후보를 병합했습니다. 중복 저장소는 유지하지 않았고 아직 저장 전입니다.`);
   }
 
   async function saveDraft() {
@@ -334,6 +392,7 @@ export default function Admin() {
     try {
       setStatus("GitHub draft 브랜치에 저장 중...");
       const result = await postJson("/api/github/save", savePayload);
+      clearSavedSection(active);
       setStatus(`저장 완료: ${result.branch || savePayload.branch}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -362,31 +421,43 @@ export default function Admin() {
 
   function updateProject(next: Partial<ProjectEntry>) {
     setProjects((items) => items.map((item, index) => (index === projectIndex ? { ...item, ...next } : item)));
+    markSectionDirty("projects");
   }
 
   function updateResearch(next: Partial<ResearchEntry>) {
     setResearch((items) => items.map((item, index) => (index === researchIndex ? { ...item, ...next } : item)));
+    markSectionDirty("research");
   }
 
   function updateNote(next: Partial<NoteEntry>) {
     setNotes((items) => items.map((item, index) => (index === noteIndex ? { ...item, ...next } : item)));
+    markSectionDirty("notes");
   }
 
   function updateEducationEntry(index: number, next: Partial<EducationEntry>) {
     setEducation((items) => updateItem(items, index, next));
+    markSectionDirty("education");
   }
 
   function addEducationEntry() {
     setEducation((items) => appendItem(items, createEducationEntry()).items);
+    markSectionDirty("education");
     setStatus("새 타임라인 항목을 추가했습니다. 저장하면 content/education.json에 반영됩니다.");
   }
 
   function moveEducationEntry(index: number, direction: MoveDirection) {
     setEducation((items) => moveItem(items, index, direction).items);
+    markSectionDirty("education");
   }
 
   function removeEducationEntry(index: number) {
-    setEducation((items) => removeItem(items, index).items);
+    const previous = education;
+    setEducation(removeItem(previous, index).items);
+    markSectionDirty("education");
+    queueUndo("타임라인 항목을 제거했습니다. 저장 전에는 되돌릴 수 있습니다.", () => {
+      setEducation(previous);
+      markSectionDirty("education");
+    });
   }
 
   function addProject() {
@@ -396,6 +467,7 @@ export default function Admin() {
       return result.items;
     });
     setActive("projects");
+    markSectionDirty("projects");
     setStatus("새 프로젝트 초안을 추가했습니다. 저장하면 새 MDX 파일과 목록 순서가 함께 저장됩니다.");
   }
 
@@ -407,6 +479,7 @@ export default function Admin() {
       setProjectIndex(result.index);
       return result.items;
     });
+    markSectionDirty("projects");
     setStatus("선택한 프로젝트를 draft 복사본으로 만들었습니다.");
   }
 
@@ -416,12 +489,20 @@ export default function Admin() {
       setProjectIndex(result.index);
       return result.items;
     });
+    markSectionDirty("projects");
   }
 
   function archiveSelectedProject() {
-    setProjects((items) => {
-      const source = items[projectIndex];
-      return source ? updateItem(items, projectIndex, archiveEntry(source)) : items;
+    const previous = projects;
+    const previousIndex = projectIndex;
+    const source = previous[previousIndex];
+    if (!source) return;
+    setProjects(updateItem(previous, previousIndex, archiveEntry(source)));
+    markSectionDirty("projects");
+    queueUndo("프로젝트를 archived 상태로 바꿨습니다. 저장 전에는 되돌릴 수 있습니다.", () => {
+      setProjects(previous);
+      setProjectIndex(previousIndex);
+      markSectionDirty("projects");
     });
     setStatus("선택한 프로젝트를 archived 상태로 바꿨습니다.");
   }
@@ -433,6 +514,7 @@ export default function Admin() {
       return result.items;
     });
     setActive("research");
+    markSectionDirty("research");
     setStatus("새 연구 관심사 초안을 추가했습니다.");
   }
 
@@ -444,6 +526,7 @@ export default function Admin() {
       setResearchIndex(result.index);
       return result.items;
     });
+    markSectionDirty("research");
     setStatus("선택한 연구 관심사를 draft 복사본으로 만들었습니다.");
   }
 
@@ -453,12 +536,20 @@ export default function Admin() {
       setResearchIndex(result.index);
       return result.items;
     });
+    markSectionDirty("research");
   }
 
   function archiveSelectedResearch() {
-    setResearch((items) => {
-      const source = items[researchIndex];
-      return source ? updateItem(items, researchIndex, archiveEntry(source)) : items;
+    const previous = research;
+    const previousIndex = researchIndex;
+    const source = previous[previousIndex];
+    if (!source) return;
+    setResearch(updateItem(previous, previousIndex, archiveEntry(source)));
+    markSectionDirty("research");
+    queueUndo("연구 관심사를 archived 상태로 바꿨습니다. 저장 전에는 되돌릴 수 있습니다.", () => {
+      setResearch(previous);
+      setResearchIndex(previousIndex);
+      markSectionDirty("research");
     });
     setStatus("선택한 연구 관심사를 archived 상태로 바꿨습니다.");
   }
@@ -470,6 +561,7 @@ export default function Admin() {
       return result.items;
     });
     setActive("notes");
+    markSectionDirty("notes");
     setStatus("새 노트 초안을 추가했습니다.");
   }
 
@@ -481,6 +573,7 @@ export default function Admin() {
       setNoteIndex(result.index);
       return result.items;
     });
+    markSectionDirty("notes");
     setStatus("선택한 노트를 draft 복사본으로 만들었습니다.");
   }
 
@@ -490,36 +583,54 @@ export default function Admin() {
       setNoteIndex(result.index);
       return result.items;
     });
+    markSectionDirty("notes");
   }
 
   function archiveSelectedNote() {
-    setNotes((items) => {
-      const source = items[noteIndex];
-      return source ? updateItem(items, noteIndex, archiveEntry(source)) : items;
+    const previous = notes;
+    const previousIndex = noteIndex;
+    const source = previous[previousIndex];
+    if (!source) return;
+    setNotes(updateItem(previous, previousIndex, archiveEntry(source)));
+    markSectionDirty("notes");
+    queueUndo("노트를 archived 상태로 바꿨습니다. 저장 전에는 되돌릴 수 있습니다.", () => {
+      setNotes(previous);
+      setNoteIndex(previousIndex);
+      markSectionDirty("notes");
     });
     setStatus("선택한 노트를 archived 상태로 바꿨습니다.");
   }
 
   function updateSkillGroup(index: number, next: Partial<SkillGroup>) {
     setSkills((items) => updateItem(items, index, next));
+    markSectionDirty("skills");
   }
 
   function addSkillGroup() {
     setSkills((items) => appendItem(items, createSkillGroup()).items);
+    markSectionDirty("skills");
   }
 
   function moveSkillGroup(index: number, direction: MoveDirection) {
     setSkills((items) => moveItem(items, index, direction).items);
+    markSectionDirty("skills");
   }
 
   function removeSkillGroup(index: number) {
-    setSkills((items) => removeItem(items, index).items);
+    const previous = skills;
+    setSkills(removeItem(previous, index).items);
+    markSectionDirty("skills");
+    queueUndo("기술 그룹을 제거했습니다. 저장 전에는 되돌릴 수 있습니다.", () => {
+      setSkills(previous);
+      markSectionDirty("skills");
+    });
   }
 
   function addSkillItem(groupIndex: number) {
     setSkills((items) =>
       items.map((group, index) => (index === groupIndex ? { ...group, items: [...group.items, "새 기술"] } : group)),
     );
+    markSectionDirty("skills");
   }
 
   function updateSkillItem(groupIndex: number, itemIndex: number, value: string) {
@@ -530,6 +641,7 @@ export default function Admin() {
           : group,
       ),
     );
+    markSectionDirty("skills");
   }
 
   function moveSkillItem(groupIndex: number, itemIndex: number, direction: MoveDirection) {
@@ -538,36 +650,55 @@ export default function Admin() {
         index === groupIndex ? { ...group, items: moveItem(group.items, itemIndex, direction).items } : group,
       ),
     );
+    markSectionDirty("skills");
   }
 
   function removeSkillItem(groupIndex: number, itemIndex: number) {
-    setSkills((items) =>
-      items.map((group, index) =>
+    const previous = skills;
+    setSkills(
+      previous.map((group, index) =>
         index === groupIndex ? { ...group, items: removeItem(group.items, itemIndex).items } : group,
       ),
     );
+    markSectionDirty("skills");
+    queueUndo("기술 항목을 제거했습니다. 저장 전에는 되돌릴 수 있습니다.", () => {
+      setSkills(previous);
+      markSectionDirty("skills");
+    });
   }
 
   function updateStarredRepo(index: number, next: Partial<StarredRepo>) {
     setStarred((items) => updateItem(items, index, next));
+    markSectionDirty("starred");
   }
 
   function addStarredRepo() {
     setStarred((items) => appendItem(items, createStarredRepo()).items);
+    markSectionDirty("starred");
   }
 
   function moveStarredRepo(index: number, direction: MoveDirection) {
     setStarred((items) => moveItem(items, index, direction).items);
+    markSectionDirty("starred");
   }
 
   function removeStarredRepo(index: number) {
-    setStarred((items) => removeItem(items, index).items);
+    const previous = starred;
+    setStarred(removeItem(previous, index).items);
+    markSectionDirty("starred");
+    queueUndo("관심 저장소를 제거했습니다. 저장 전에는 되돌릴 수 있습니다.", () => {
+      setStarred(previous);
+      markSectionDirty("starred");
+    });
   }
 
   function renderGitHubImportPanel(scope: "projects" | "skills" | "starred") {
     const projectCandidates = importResult?.projects ?? [];
     const skillCandidates = importResult?.skills ?? [];
     const starredCandidates = importResult?.starred ?? [];
+    const appliedCount = appliedImport[scope].length;
+    const allSkillCandidatesApplied = skillCandidates.length > 0 && skillCandidates.every((candidate) => isImportApplied(appliedImport, "skills", candidate.label));
+    const allStarredCandidatesApplied = starredCandidates.length > 0 && starredCandidates.every((candidate) => isImportApplied(appliedImport, "starred", candidate.name));
     return (
       <div className="admin-import">
         <div className="admin-import-head">
@@ -602,49 +733,74 @@ export default function Admin() {
             ))}
           </div>
         ) : null}
+        {appliedCount > 0 && (
+          <div className="admin-import-state">
+            Applied to {sectionLabel(scope)} editor · not saved yet ({appliedCount})
+          </div>
+        )}
         {scope === "projects" && (
           <div className="admin-candidate-list">
             {projectCandidates.length === 0 && <div className="admin-empty">프로젝트 후보가 없습니다. GitHub source를 가져오세요.</div>}
-            {projectCandidates.map((candidate) => (
-              <div className="admin-candidate" key={candidate.slug}>
-                <div>
-                  <strong>{candidate.name}</strong>
-                  <p>{candidate.desc}</p>
-                  <span>{candidate.tags.join(", ") || "no tags"}</span>
+            {projectCandidates.map((candidate) => {
+              const applied = isImportApplied(appliedImport, "projects", candidate.slug);
+              return (
+                <div className="admin-candidate" key={candidate.slug}>
+                  <div>
+                    <strong>{candidate.name}</strong>
+                    <p>{candidate.desc}</p>
+                    <span>{candidate.tags.join(", ") || "no tags"}</span>
+                    {applied && <span className="admin-applied-badge">Applied · not saved</span>}
+                  </div>
+                  <button type="button" disabled={!canEdit || applied} onClick={() => applyProjectCandidate(candidate)}>{applied ? "Applied" : "Apply"}</button>
                 </div>
-                <button type="button" disabled={!canEdit} onClick={() => applyProjectCandidate(candidate)}>Apply</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         {scope === "skills" && (
           <div className="admin-candidate-list">
             {skillCandidates.length === 0 && <div className="admin-empty">기술 스택 후보가 없습니다. GitHub profile 또는 repo를 가져오세요.</div>}
-            {skillCandidates.length > 0 && <button type="button" disabled={!canEdit} onClick={() => applySkillCandidates()}>Apply skill groups</button>}
-            {skillCandidates.map((candidate) => (
-              <div className="admin-candidate" key={candidate.label}>
-                <div>
-                  <strong>{candidate.label}</strong>
-                  <p>{candidate.items.join(", ")}</p>
+            {skillCandidates.length > 0 && (
+              <button type="button" disabled={!canEdit || allSkillCandidatesApplied} onClick={() => applySkillCandidates()}>
+                {allSkillCandidatesApplied ? "Skill groups applied" : "Apply skill groups"}
+              </button>
+            )}
+            {skillCandidates.map((candidate) => {
+              const applied = isImportApplied(appliedImport, "skills", candidate.label);
+              return (
+                <div className="admin-candidate" key={candidate.label}>
+                  <div>
+                    <strong>{candidate.label}</strong>
+                    <p>{candidate.items.join(", ")}</p>
+                    {applied && <span className="admin-applied-badge">Applied · not saved</span>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         {scope === "starred" && (
           <div className="admin-candidate-list">
             {starredCandidates.length === 0 && <div className="admin-empty">관심 저장소 후보가 없습니다. GitHub profile을 가져오세요.</div>}
-            {starredCandidates.length > 0 && <button type="button" disabled={!canEdit} onClick={applyAllStarredCandidates}>Apply all starred</button>}
-            {starredCandidates.map((candidate) => (
-              <div className="admin-candidate" key={candidate.name}>
-                <div>
-                  <strong>{candidate.name}</strong>
-                  <p>{candidate.desc}</p>
-                  <span>★ {candidate.stars}</span>
+            {starredCandidates.length > 0 && (
+              <button type="button" disabled={!canEdit || allStarredCandidatesApplied} onClick={applyAllStarredCandidates}>
+                {allStarredCandidatesApplied ? "All starred applied" : "Apply all starred"}
+              </button>
+            )}
+            {starredCandidates.map((candidate) => {
+              const applied = isImportApplied(appliedImport, "starred", candidate.name);
+              return (
+                <div className="admin-candidate" key={candidate.name}>
+                  <div>
+                    <strong>{candidate.name}</strong>
+                    <p>{candidate.desc}</p>
+                    <span>★ {candidate.stars}</span>
+                    {applied && <span className="admin-applied-badge">Applied · not saved</span>}
+                  </div>
+                  <button type="button" disabled={!canEdit || applied} onClick={() => applyStarredCandidate(candidate)}>{applied ? "Applied" : "Apply"}</button>
                 </div>
-                <button type="button" disabled={!canEdit} onClick={() => applyStarredCandidate(candidate)}>Apply</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -655,13 +811,13 @@ export default function Admin() {
     if (active === "profile") {
       return (
         <div className="admin-grid">
-          <Field disabled={!canEdit} label="Name" value={profile.name} onChange={(name) => setProfile({ ...profile, name })} />
-          <Field disabled={!canEdit} label="Handle" value={profile.handle} onChange={(handle) => setProfile({ ...profile, handle })} />
-          <Field disabled={!canEdit} label="Status" value={profile.status} onChange={(status) => setProfile({ ...profile, status })} />
-          <Field disabled={!canEdit} label="Avatar URL" value={profile.avatarUrl ?? ""} onChange={(avatarUrl) => setProfile({ ...profile, avatarUrl })} />
-          <TextArea disabled={!canEdit} label="Headline" value={profile.headline} onChange={(headline) => setProfile({ ...profile, headline })} rows={3} />
-          <TextArea disabled={!canEdit} label="Lead" value={profile.summaryLead} onChange={(summaryLead) => setProfile({ ...profile, summaryLead })} rows={4} />
-          <TextArea disabled={!canEdit} label="Summary paragraphs" value={profile.summary.join("\n\n")} onChange={(value) => setProfile({ ...profile, summary: value.split(/\n\s*\n/).filter(Boolean) })} rows={8} />
+          <Field disabled={!canEdit} label="Name" value={profile.name} onChange={(name) => updateProfile({ name })} />
+          <Field disabled={!canEdit} label="Handle" value={profile.handle} onChange={(handle) => updateProfile({ handle })} />
+          <Field disabled={!canEdit} label="Status" value={profile.status} onChange={(status) => updateProfile({ status })} />
+          <Field disabled={!canEdit} label="Avatar URL" value={profile.avatarUrl ?? ""} onChange={(avatarUrl) => updateProfile({ avatarUrl })} />
+          <TextArea disabled={!canEdit} label="Headline" value={profile.headline} onChange={(headline) => updateProfile({ headline })} rows={3} />
+          <TextArea disabled={!canEdit} label="Lead" value={profile.summaryLead} onChange={(summaryLead) => updateProfile({ summaryLead })} rows={4} />
+          <TextArea disabled={!canEdit} label="Summary paragraphs" value={profile.summary.join("\n\n")} onChange={(value) => updateProfile({ summary: value.split(/\n\s*\n/).filter(Boolean) })} rows={8} />
         </div>
       );
     }
@@ -919,18 +1075,24 @@ export default function Admin() {
           <h1>Admin</h1>
           <p>{session?.authenticated ? `@${session.login}` : localPreview ? "local preview" : "GitHub login required"}</p>
           <nav>
-            {SECTIONS.map((section) => (
-              <button key={section.key} className={active === section.key ? "active" : ""} onClick={() => setActive(section.key)}>
-                {section.label}
-              </button>
-            ))}
+            {SECTIONS.map((section) => {
+              const dirty = hasDirtySection(dirtySections, section.key);
+              return (
+                <button key={section.key} className={[active === section.key ? "active" : "", dirty ? "dirty" : ""].filter(Boolean).join(" ")} onClick={() => setActive(section.key)}>
+                  <span>{section.label}</span>
+                  {dirty && <span className="admin-dirty-dot" title="Unsaved changes" />}
+                </button>
+              );
+            })}
           </nav>
         </aside>
         <section className="admin-main" style={{ background: T.surface, borderColor: T.border }}>
           <header className="admin-header">
             <div>
-              <span className="admin-kicker">draft branch</span>
+              <span className="admin-kicker">current save scope</span>
               <h2>{savePayload.branch}</h2>
+              <p className="admin-scope">{currentScope}{activeDirty ? " · unsaved changes" : ""}</p>
+              {dirtySections.length > 0 && <p className="admin-unsaved-summary">Unsaved sections: {dirtySectionLabels}</p>}
               <p>{status}</p>
             </div>
             <div className="admin-actions">
@@ -938,10 +1100,19 @@ export default function Admin() {
               {!session?.authenticated && !localPreview && <a href="/api/auth/login">GitHub Login</a>}
               {!session?.authenticated && import.meta.env.DEV && !localPreview && <a href="/admin?demo=1">Local Preview</a>}
               {session?.authenticated && <a href="/api/auth/logout">Logout</a>}
-              <button type="button" disabled={!canEdit} onClick={saveDraft}>Save draft</button>
-              <button type="button" disabled={!canEdit} onClick={publishDraft}>Publish PR</button>
+              <button type="button" disabled={!canEdit} onClick={saveDraft}>{sectionActionLabel(active, "save")}</button>
+              <button type="button" disabled={!canEdit} onClick={publishDraft}>{sectionActionLabel(active, "publish")}</button>
             </div>
           </header>
+          {undoAction && (
+            <div className="admin-undo-toast" role="status">
+              <span>{undoAction.message}</span>
+              <div>
+                <button type="button" onClick={undoAction.onUndo}>Undo</button>
+                <button type="button" onClick={() => setUndoAction(null)}>Dismiss</button>
+              </div>
+            </div>
+          )}
           <div className="admin-panel">{renderEditor()}</div>
         </section>
       </div>
@@ -953,19 +1124,30 @@ export default function Admin() {
         .admin-back { font-family: ${FONT_MONO}; font-size: .75rem; text-decoration: none; }
         .admin-sidebar nav { display: grid; gap: 4px; margin-top: 28px; }
         .admin-sidebar button, .admin-actions button, .admin-actions a, .admin-editor-bar button,
-        .admin-toolbar button, .admin-card-actions button, .admin-inline-list button, .admin-import button, .admin-candidate button {
+        .admin-toolbar button, .admin-card-actions button, .admin-inline-list button, .admin-import button, .admin-candidate button, .admin-undo-toast button {
           border: 1px solid ${T.border}; background: ${T.surface}; color: ${T.sub};
           border-radius: 4px; padding: 8px 10px; font-family: ${FONT_MONO}; cursor: pointer; text-decoration: none;
         }
-        .admin-sidebar button { text-align: left; }
+        .admin-sidebar button { text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         .admin-sidebar button.active, .admin-editor-bar button.active { color: ${T.green}; border-color: ${T.green}; background: ${T.greenBg}; }
+        .admin-sidebar button.dirty { border-color: ${T.green}; }
+        .admin-dirty-dot { width: 7px; height: 7px; border-radius: 999px; background: ${T.green}; box-shadow: 0 0 0 3px ${T.greenBg}; flex: 0 0 auto; }
         .admin-actions button:disabled, .admin-toolbar button:disabled, .admin-card-actions button:disabled, .admin-inline-list button:disabled, .admin-import button:disabled, .admin-candidate button:disabled { opacity: .45; cursor: not-allowed; }
         .admin-toolbar button.danger, .admin-card-actions button.danger, .admin-inline-list button.danger { color: ${T.red}; border-color: ${T.red}; background: ${T.redBg}; }
         .admin-main { border-left: 0; min-width: 0; padding: 28px; }
         .admin-header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 22px; }
         .admin-header h2 { margin: 4px 0 6px; font-size: 1.35rem; font-family: ${FONT_MONO}; }
+        .admin-scope { font-family: ${FONT_MONO}; font-size: .76rem; }
+        .admin-unsaved-summary { color: ${T.green} !important; font-family: ${FONT_MONO}; font-size: .76rem; }
         .admin-kicker { color: ${T.green}; font-family: ${FONT_MONO}; font-size: .72rem; text-transform: uppercase; }
         .admin-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+        .admin-undo-toast {
+          border: 1px solid ${T.green}; background: ${T.greenBg}; color: ${T.text};
+          border-radius: 6px; padding: 11px 12px; margin-bottom: 14px; display: flex; gap: 12px; justify-content: space-between; align-items: center;
+        }
+        .admin-undo-toast span { line-height: 1.6; }
+        .admin-undo-toast div { display: flex; gap: 8px; flex-wrap: wrap; }
+        .admin-undo-toast button { border-color: ${T.green}; color: ${T.green}; background: ${T.surface}; }
         .admin-panel { border: 1px solid ${T.border}; border-radius: 6px; padding: 18px; background: ${T.bg}; }
         .admin-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
         .admin-stack { display: grid; gap: 14px; }
@@ -984,10 +1166,13 @@ export default function Admin() {
           border-radius: 4px; padding: 9px 10px; font-family: ${FONT_SANS}; font-size: .9rem;
         }
         .admin-import-warnings { display: grid; gap: 4px; color: ${T.muted}; font-family: ${FONT_MONO}; font-size: .68rem; }
+        .admin-import-state { border: 1px solid ${T.green}; background: ${T.greenBg}; color: ${T.green}; border-radius: 4px; padding: 8px 10px; font-family: ${FONT_MONO}; font-size: .72rem; }
         .admin-candidate-list { display: grid; gap: 8px; }
         .admin-candidate { border: 1px solid ${T.border}; background: ${T.bg}; border-radius: 4px; padding: 11px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+        .admin-candidate > div { display: grid; gap: 5px; }
         .admin-candidate p { color: ${T.sub}; margin: 5px 0; line-height: 1.6; }
         .admin-candidate span { color: ${T.muted}; font-family: ${FONT_MONO}; font-size: .68rem; }
+        .admin-candidate .admin-applied-badge { width: fit-content; color: ${T.green}; border: 1px solid ${T.green}; background: ${T.greenBg}; border-radius: 999px; padding: 3px 7px; }
         .admin-field { display: grid; gap: 6px; color: ${T.sub}; font-size: .78rem; font-family: ${FONT_MONO}; }
         .admin-field-block { grid-column: 1 / -1; }
         .admin-field input, .admin-field textarea, .admin-field select, .admin-stack select, .admin-inline-row input, .admin-editor textarea, .admin-wysiwyg {
@@ -1009,7 +1194,9 @@ export default function Admin() {
           .admin-sidebar { border-right: 0; border-bottom: 1px solid; }
           .admin-grid { grid-template-columns: 1fr; }
           .admin-header { flex-direction: column; }
-          .admin-actions { justify-content: flex-start; }
+          .admin-actions { justify-content: flex-start; width: 100%; }
+          .admin-actions button, .admin-actions a { flex: 1 1 160px; text-align: center; }
+          .admin-undo-toast { flex-direction: column; align-items: flex-start; }
           .admin-card-head { flex-direction: column; }
           .admin-import-form { grid-template-columns: 1fr; }
           .admin-candidate { grid-template-columns: 1fr; }
