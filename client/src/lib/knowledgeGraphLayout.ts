@@ -18,6 +18,16 @@ export interface PositionedKnowledgeGraph {
   links: PositionedKnowledgeLink[];
 }
 
+export interface KnowledgeGraphPointer {
+  x: number;
+  y: number;
+}
+
+export interface ProjectedKnowledgeNode extends PositionedKnowledgeNode {
+  influence: number;
+  scale: number;
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -44,21 +54,24 @@ function rootLevel(kind: KnowledgeGraphNode["kind"]): number {
   return 3;
 }
 
-function levelY(level: number, height: number): number {
-  if (level === 0) return Math.round(clamp(height * 0.24, 62, 94));
-  if (level === 1) return Math.round(height * 0.43);
-  if (level === 2) return Math.round(height * 0.63);
-  return Math.round(height * 0.82);
+function ringRadius(level: number, width: number, height: number): number {
+  const base = Math.min(width, height);
+  if (level === 0) return 0;
+  if (level === 1) return base * 0.24;
+  if (level === 2) return base * 0.37;
+  return base * 0.46;
 }
 
-function branchSpread(level: number, width: number): number {
-  if (level === 1) return width * 0.22;
-  if (level === 2) return width * 0.16;
-  return width * 0.11;
+function siblingAngleSpread(level: number, count: number): number {
+  if (count <= 1) return 0;
+  if (level === 1) return (Math.PI * 2) / count;
+  if (level === 2) return Math.min(0.58, Math.PI / Math.max(4, count + 2));
+  return Math.min(0.44, Math.PI / Math.max(5, count + 3));
 }
 
 export function layoutKnowledgeGraph(graph: KnowledgeGraphData, width: number, height: number): PositionedKnowledgeGraph {
   const centerX = Math.round(width / 2);
+  const centerY = Math.round(height / 2);
   const padding = 22;
   const visualNodePool = graph.nodes.filter((node) => node.kind !== "term");
   const poolIds = new Set(visualNodePool.map((node) => node.id));
@@ -73,6 +86,7 @@ export function layoutKnowledgeGraph(graph: KnowledgeGraphData, width: number, h
   const linksByNode = new Map<string, KnowledgeGraphLink[]>();
   const positioned: PositionedKnowledgeNode[] = [];
   const byId = new Map<string, PositionedKnowledgeNode>();
+  const angles = new Map<string, number>();
 
   for (const link of visualLinks) {
     if (!nodeIds.has(link.source) || !nodeIds.has(link.target)) continue;
@@ -104,38 +118,35 @@ export function layoutKnowledgeGraph(graph: KnowledgeGraphData, width: number, h
       parentGroups.set(parentId, [...(parentGroups.get(parentId) ?? []), node]);
     }
 
-    const freeNodes = parentGroups.get("free") ?? [];
-    const freeCount = freeNodes.length;
-    let freeIndex = 0;
-
     for (const [parentId, children] of Array.from(parentGroups.entries())) {
       const parent = byId.get(parentId);
-      const spread = branchSpread(level, width);
       children.forEach((node: KnowledgeGraphNode, index: number) => {
         const radius = nodeRadius(node);
-        let x = centerX;
+        const ring = ringRadius(level, width, height);
+        const spread = siblingAngleSpread(level, children.length);
+        let angle = -Math.PI / 2;
         if (level > 0) {
-          const siblingOffset = (index - (children.length - 1) / 2) * spread;
-          const jitter = (hashFraction(node.id, "root-x") - 0.5) * spread * 0.48;
           if (parent) {
-            const drift = (hashFraction(`${parentId}-${node.id}`, "branch") - 0.5) * spread * 0.72;
-            x = parent.x + siblingOffset + drift + jitter;
+            const parentAngle = angles.get(parentId) ?? -Math.PI / 2;
+            const jitter = (hashFraction(node.id, "orbit-jitter") - 0.5) * spread * 0.34;
+            angle = parentAngle + (index - (children.length - 1) / 2) * spread + jitter;
           } else {
-            const globalOffset = (freeIndex - (freeCount - 1) / 2) * (width * 0.72) / Math.max(1, freeCount);
-            x = centerX + globalOffset + jitter;
-            freeIndex += 1;
+            const orbitCount = Math.max(1, children.length);
+            angle = -Math.PI / 2 + index * ((Math.PI * 2) / orbitCount) + (hashFraction(node.id, "free-orbit") - 0.5) * 0.16;
           }
         }
 
-        const y = levelY(level, height) + (level === 0 ? 0 : Math.round((hashFraction(node.id, "root-y") - 0.5) * 18));
+        const x = centerX + Math.cos(angle) * ring;
+        const y = centerY + Math.sin(angle) * ring;
         const positionedNode = {
           ...node,
           x: Math.round(clamp(x, padding, width - padding)),
-          y: Math.round(clamp(y, padding + 6, height - 16)),
+          y: Math.round(clamp(y, padding, height - padding)),
           radius,
         };
         positioned.push(positionedNode);
         byId.set(node.id, positionedNode);
+        angles.set(node.id, angle);
       });
     }
   }
@@ -150,19 +161,47 @@ export function layoutKnowledgeGraph(graph: KnowledgeGraphData, width: number, h
   return { nodes: positioned, links };
 }
 
-export function curvedKnowledgeLinkPath(link: PositionedKnowledgeLink): string {
-  const sx = link.source.x;
-  const sy = link.source.y;
-  const tx = link.target.x;
-  const ty = link.target.y;
+export function projectKnowledgeNode(node: PositionedKnowledgeNode, pointer: KnowledgeGraphPointer | null): ProjectedKnowledgeNode {
+  if (!pointer) return { ...node, influence: 0, scale: 1 };
+  let dx = node.x - pointer.x;
+  let dy = node.y - pointer.y;
+  let distance = Math.hypot(dx, dy);
+  if (distance < 0.001) {
+    const angle = hashFraction(node.id, "pointer-angle") * Math.PI * 2;
+    dx = Math.cos(angle);
+    dy = Math.sin(angle);
+    distance = 1;
+  }
+  const influence = clamp(1 - distance / 84, 0, 1);
+  const force = influence * influence * 16;
+  const unitX = dx / distance;
+  const unitY = dy / distance;
+  return {
+    ...node,
+    x: Number((node.x + unitX * force).toFixed(2)),
+    y: Number((node.y + unitY * force).toFixed(2)),
+    influence,
+    scale: Number((1 + influence * 0.16).toFixed(3)),
+  };
+}
+
+export function curvedKnowledgeLinkPath(link: PositionedKnowledgeLink, pointer: KnowledgeGraphPointer | null = null): string {
+  const source = projectKnowledgeNode(link.source, pointer);
+  const target = projectKnowledgeNode(link.target, pointer);
+  const sx = source.x;
+  const sy = source.y;
+  const tx = target.x;
+  const ty = target.y;
   const dx = tx - sx;
   const dy = ty - sy;
-  const vertical = Math.max(28, Math.abs(dy));
-  const sway = (hashFraction(`${link.sourceId}-${link.targetId}`, "root-path") - 0.5) * 22;
-  const c1x = Math.round(sx + dx * 0.18 + sway);
-  const c1y = Math.round(sy + vertical * 0.42);
-  const c2x = Math.round(tx - dx * 0.22 - sway * 0.65);
-  const c2y = Math.round(ty - vertical * 0.28);
+  const distance = Math.max(1, Math.hypot(dx, dy));
+  const normalX = -dy / distance;
+  const normalY = dx / distance;
+  const bend = (hashFraction(`${link.sourceId}-${link.targetId}`, "neural-path") - 0.5) * clamp(distance * 0.34, 18, 42);
+  const c1x = Math.round(sx + dx * 0.34 + normalX * bend);
+  const c1y = Math.round(sy + dy * 0.34 + normalY * bend);
+  const c2x = Math.round(sx + dx * 0.66 + normalX * bend);
+  const c2y = Math.round(sy + dy * 0.66 + normalY * bend);
 
-  return `M ${sx} ${sy} C ${c1x} ${c1y} ${c2x} ${c2y} ${tx} ${ty}`;
+  return `M ${Math.round(sx)} ${Math.round(sy)} C ${c1x} ${c1y} ${c2x} ${c2y} ${Math.round(tx)} ${Math.round(ty)}`;
 }

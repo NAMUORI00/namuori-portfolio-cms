@@ -1,11 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type PointerEvent } from "react";
 import type { PortfolioTheme } from "@/content/theme";
 import type { KnowledgeGraphData, KnowledgeGraphNode } from "@/lib/knowledgeGraph";
-import { curvedKnowledgeLinkPath, layoutKnowledgeGraph } from "@/lib/knowledgeGraphLayout";
+import { curvedKnowledgeLinkPath, layoutKnowledgeGraph, projectKnowledgeNode, type KnowledgeGraphPointer } from "@/lib/knowledgeGraphLayout";
 import { FONT_MONO, FONT_SANS } from "@/content/theme";
 
 const WIDTH = 276;
 const HEIGHT = 360;
+const INNER_ORBIT = Math.min(WIDTH, HEIGHT) * 0.24;
+const OUTER_ORBIT = Math.min(WIDTH, HEIGHT) * 0.37;
 
 function nodeColor(node: KnowledgeGraphNode, T: PortfolioTheme): string {
   if (node.kind === "profile") return T.green;
@@ -41,7 +43,9 @@ export function KnowledgeGraphRail({
   active: string;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
+  const [pointer, setPointer] = useState<KnowledgeGraphPointer | null>(null);
   const layout = useMemo(() => layoutKnowledgeGraph(graph, WIDTH, HEIGHT), [graph]);
+  const projectedNodes = useMemo(() => new Map(layout.nodes.map((node) => [node.id, projectKnowledgeNode(node, pointer)])), [layout.nodes, pointer]);
   const hoveredNode = layout.nodes.find((node) => node.id === hovered) ?? null;
   const activeNode = layout.nodes.find((node) => node.section === active) ?? null;
   const focusNode = hoveredNode ?? activeNode;
@@ -70,7 +74,15 @@ export function KnowledgeGraphRail({
     [layout.nodes],
   );
   const topNodes = layout.nodes.filter((node) => node.kind !== "profile").slice(0, 4);
-  const profileNode = layout.nodes.find((node) => node.kind === "profile");
+
+  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    setPointer({
+      x: ((event.clientX - rect.left) / rect.width) * WIDTH,
+      y: ((event.clientY - rect.top) / rect.height) * HEIGHT,
+    });
+  }
 
   return (
     <aside
@@ -92,10 +104,10 @@ export function KnowledgeGraphRail({
     >
       <div>
         <div style={{ color: T.green, fontFamily: FONT_MONO, fontSize: "0.62rem", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-          Knowledge Roots
+          Knowledge Graph
         </div>
         <p style={{ margin: "0.35rem 0 0", color: T.sub, fontFamily: FONT_SANS, fontSize: "0.72rem", lineHeight: 1.6, wordBreak: "keep-all" }}>
-          프로필에서 프로젝트와 노트가 나무뿌리처럼 갈라지는 관심사 지도입니다.
+          마우스 위치에 따라 부드럽게 반응하는 원형 관심사 KG입니다.
         </p>
       </div>
 
@@ -111,10 +123,15 @@ export function KnowledgeGraphRail({
         }}
       >
         <svg
-          className="knowledge-canvas knowledge-root-canvas"
+          className="knowledge-canvas knowledge-neural-canvas"
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           aria-hidden="true"
           focusable="false"
+          onPointerMove={handlePointerMove}
+          onPointerLeave={() => {
+            setPointer(null);
+            setHovered(null);
+          }}
           style={{ display: "block", width: "100%", height: "auto" }}
         >
           <defs>
@@ -130,36 +147,16 @@ export function KnowledgeGraphRail({
           <rect x="0" y="0" width={WIDTH} height={HEIGHT} fill={T.bg} />
           <rect x="0" y="0" width={WIDTH} height={HEIGHT} fill="url(#knowledge-grid)" />
           <circle cx={WIDTH / 2} cy={HEIGHT * 0.48} r="128" fill="url(#knowledge-vignette)" />
-          {profileNode && (
-            <>
-              <path
-                className="knowledge-root-spine"
-                d={`M ${profileNode.x} ${Math.max(18, profileNode.y - 42)} C ${profileNode.x - 10} ${profileNode.y - 10} ${profileNode.x + 8} ${profileNode.y + 34} ${profileNode.x} ${HEIGHT - 24}`}
-                fill="none"
-                stroke={T.green}
-                strokeWidth="2.2"
-                strokeOpacity="0.16"
-                strokeLinecap="round"
-              />
-              <path
-                className="knowledge-root-spine knowledge-root-spine-soft"
-                d={`M ${profileNode.x} ${profileNode.y - 18} C ${profileNode.x + 16} ${profileNode.y + 24} ${profileNode.x - 20} ${profileNode.y + 112} ${profileNode.x + 4} ${HEIGHT - 32}`}
-                fill="none"
-                stroke={T.greenLight}
-                strokeWidth="0.85"
-                strokeOpacity="0.18"
-                strokeLinecap="round"
-              />
-            </>
-          )}
+          <circle className="knowledge-orbit knowledge-orbit-inner" cx={WIDTH / 2} cy={HEIGHT / 2} r={INNER_ORBIT} fill="none" stroke={T.green} strokeWidth="0.8" strokeOpacity="0.15" />
+          <circle className="knowledge-orbit knowledge-orbit-outer" cx={WIDTH / 2} cy={HEIGHT / 2} r={OUTER_ORBIT} fill="none" stroke={T.greenLight} strokeWidth="0.65" strokeOpacity="0.12" />
           {layout.links.map((link) => {
             const isLit = !focusNode || link.sourceId === focusNode.id || link.targetId === focusNode.id;
             const edgeState = !focusNode ? "idle" : isLit ? "active" : "dim";
-            const path = curvedKnowledgeLinkPath(link);
+            const path = curvedKnowledgeLinkPath(link, pointer);
             return (
               <g key={`${link.sourceId}-${link.targetId}-${link.kind}`}>
                 <path
-                  className="knowledge-edge knowledge-edge-base knowledge-root-thread"
+                  className="knowledge-edge knowledge-edge-base knowledge-neural-edge"
                   data-connects={`${link.sourceId} ${link.targetId}`}
                   data-edge-state={edgeState}
                   d={path}
@@ -173,6 +170,7 @@ export function KnowledgeGraphRail({
             );
           })}
           {layout.nodes.map((node) => {
+            const projected = projectedNodes.get(node.id) ?? projectKnowledgeNode(node, pointer);
             const color = nodeColor(node, T);
             const isActive = node.section === active || node.id === hovered;
             const isLit = !focusNode || connected.has(node.id);
@@ -182,7 +180,9 @@ export function KnowledgeGraphRail({
                 className="knowledge-node-group"
                 key={node.id}
                 data-node-id={node.id}
+                data-neural-node={node.id}
                 data-node-state={isHovered ? "hovered" : isLit ? "connected" : "dim"}
+                data-pointer-influence={projected.influence.toFixed(2)}
                 aria-label={`${node.label} ${kindLabel(node.kind)}`}
                 onPointerEnter={() => setHovered(node.id)}
                 onPointerLeave={() => setHovered(null)}
@@ -191,9 +191,9 @@ export function KnowledgeGraphRail({
                 {(isHovered || (!hoveredNode && isActive)) && (
                   <circle
                     className="knowledge-ripple"
-                    cx={node.x}
-                    cy={node.y}
-                    r={node.radius + 8}
+                    cx={projected.x}
+                    cy={projected.y}
+                    r={node.radius * projected.scale + 8}
                     fill="none"
                     stroke={color}
                     strokeWidth="1"
@@ -202,17 +202,17 @@ export function KnowledgeGraphRail({
                 )}
                 <circle
                   className={isHovered || (!hoveredNode && isActive) ? "knowledge-halo active" : "knowledge-halo"}
-                  cx={node.x}
-                  cy={node.y}
-                  r={node.radius + (isActive ? 8 : 4)}
+                  cx={projected.x}
+                  cy={projected.y}
+                  r={node.radius * projected.scale + (isActive ? 8 : 4)}
                   fill={color}
                   opacity={isActive ? 0.18 : 0.045}
                 />
                 <circle
                   className={isLit ? "knowledge-node lit" : "knowledge-node"}
-                  cx={node.x}
-                  cy={node.y}
-                  r={node.radius}
+                  cx={projected.x}
+                  cy={projected.y}
+                  r={node.radius * projected.scale}
                   fill={color}
                   opacity={isLit ? (hoveredNode ? 0.86 : 0.72) : 0.2}
                   stroke={isActive ? T.green : T.bg}
@@ -220,8 +220,8 @@ export function KnowledgeGraphRail({
                 />
                 {(node.kind === "profile" || isHovered || (!hoveredNode && isActive)) && (
                   <text
-                    x={node.x}
-                    y={node.y - node.radius - 7}
+                    x={projected.x}
+                    y={projected.y - node.radius * projected.scale - 7}
                     textAnchor="middle"
                     fill={isActive ? T.green : T.sub}
                     fontFamily={FONT_MONO}
@@ -233,8 +233,8 @@ export function KnowledgeGraphRail({
                 <circle
                   className="knowledge-hit"
                   aria-hidden="true"
-                  cx={node.x}
-                  cy={node.y}
+                  cx={projected.x}
+                  cy={projected.y}
                   r={node.radius + 12}
                   fill="transparent"
                   pointerEvents="all"
@@ -248,7 +248,7 @@ export function KnowledgeGraphRail({
                 key={`hover-${link.sourceId}-${link.targetId}-${link.kind}`}
                 className="knowledge-edge knowledge-hover-signal"
                 data-connects={`${link.sourceId} ${link.targetId}`}
-                d={curvedKnowledgeLinkPath(link)}
+                d={curvedKnowledgeLinkPath(link, pointer)}
                 fill="none"
                 stroke={T.greenLight}
                 strokeWidth={Math.max(0.7, Math.min(1.35, link.weight / 2.2))}
@@ -263,23 +263,31 @@ export function KnowledgeGraphRail({
             cursor: default;
           }
           #knowledge-rail .knowledge-edge {
-            transition: stroke-opacity 180ms ease, stroke-width 180ms ease;
+            transition: stroke-opacity 180ms ease, stroke-width 180ms ease, d 120ms ease;
           }
-          #knowledge-rail .knowledge-root-spine {
-            filter: drop-shadow(0 0 8px ${T.green}24);
+          #knowledge-rail .knowledge-orbit {
+            stroke-dasharray: 2 10;
+            transform-box: fill-box;
+            transform-origin: center;
+            animation: neuralDrift 14s linear infinite;
           }
-          #knowledge-rail .knowledge-root-thread {
+          #knowledge-rail .knowledge-orbit-outer {
+            animation-duration: 19s;
+            animation-direction: reverse;
+          }
+          #knowledge-rail .knowledge-neural-edge {
             stroke-linejoin: round;
+            filter: drop-shadow(0 0 5px ${T.green}1f);
           }
           #knowledge-rail .knowledge-node {
             transform-box: fill-box;
             transform-origin: center;
-            transition: opacity 180ms ease, stroke 180ms ease, transform 180ms ease;
+            transition: opacity 180ms ease, stroke 180ms ease, r 120ms ease, cx 120ms ease, cy 120ms ease;
           }
           #knowledge-rail .knowledge-halo {
             transform-box: fill-box;
             transform-origin: center;
-            transition: opacity 160ms ease;
+            transition: opacity 160ms ease, r 120ms ease, cx 120ms ease, cy 120ms ease;
           }
           #knowledge-rail .knowledge-halo.active {
             animation: neuralPulse 2.2s ease-out infinite;
@@ -300,7 +308,6 @@ export function KnowledgeGraphRail({
           #knowledge-rail .knowledge-node-group:hover .knowledge-node {
             opacity: 0.98;
             stroke: ${T.green};
-            transform: scale(1.14);
           }
           #knowledge-rail .knowledge-node-group:hover .knowledge-halo {
             opacity: 0.24;
@@ -314,6 +321,10 @@ export function KnowledgeGraphRail({
             0% { opacity: 0.22; transform: scale(0.92); }
             72% { opacity: 0.05; transform: scale(1.35); }
             100% { opacity: 0; transform: scale(1.48); }
+          }
+          @keyframes neuralDrift {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
           }
           @keyframes signalFlow {
             from { stroke-dashoffset: 0; }

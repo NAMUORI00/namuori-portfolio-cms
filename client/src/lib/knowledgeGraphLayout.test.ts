@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { KnowledgeGraphData } from "./knowledgeGraph";
-import { curvedKnowledgeLinkPath, layoutKnowledgeGraph } from "./knowledgeGraphLayout";
+import { curvedKnowledgeLinkPath, layoutKnowledgeGraph, projectKnowledgeNode } from "./knowledgeGraphLayout";
 
 const graph: KnowledgeGraphData = {
   nodes: [
@@ -32,16 +32,17 @@ function nodeById(layout: ReturnType<typeof layoutKnowledgeGraph>, id: string) {
 }
 
 describe("layoutKnowledgeGraph", () => {
-  it("places the profile node as a root origin above the branching layers", () => {
+  it("places the profile node at the center and connected nodes on orbital rings", () => {
     const layout = layoutKnowledgeGraph(graph, 260, 340);
     const profile = nodeById(layout, "profile");
     const project = nodeById(layout, "project:a");
     const note = nodeById(layout, "note:n");
 
     expect(profile.x).toBe(130);
-    expect(profile.y).toBeLessThan(118);
-    expect(project.y).toBeGreaterThan(profile.y + 34);
-    expect(note.y).toBeGreaterThan(project.y + 34);
+    expect(profile.y).toBe(170);
+    expect(distanceBetween(layout, "profile", "project:a")).toBeGreaterThanOrEqual(54);
+    expect(distanceBetween(layout, "profile", "project:a")).toBeLessThanOrEqual(78);
+    expect(distanceBetween(layout, "profile", "note:n")).toBeGreaterThan(distanceBetween(layout, "profile", "project:a") + 26);
     for (const node of layout.nodes) {
       expect(node.x).toBeGreaterThanOrEqual(22);
       expect(node.x).toBeLessThanOrEqual(238);
@@ -59,16 +60,16 @@ describe("layoutKnowledgeGraph", () => {
     expect(layout.links.length).toBe(2);
   });
 
-  it("generates root-like cubic paths instead of straight line commands", () => {
+  it("generates neural curved paths instead of straight line commands", () => {
     const layout = layoutKnowledgeGraph(graph, 260, 340);
     const path = curvedKnowledgeLinkPath(layout.links[0]);
 
     expect(path).toMatch(/^M \d+ \d+ C /);
-    expect(path).toContain(`M 130 ${nodeById(layout, "profile").y}`);
+    expect(path).toContain(`M 130 170`);
     expect(path).not.toContain(" L ");
   });
 
-  it("excludes term nodes and term links from the visual root tree", () => {
+  it("excludes term nodes and term links from the visual neural graph", () => {
     const clustered: KnowledgeGraphData = {
       nodes: [
         { id: "profile", label: "NAMUORI00", kind: "profile", weight: 5 },
@@ -84,13 +85,10 @@ describe("layoutKnowledgeGraph", () => {
       ],
     };
     const layout = layoutKnowledgeGraph(clustered, 260, 340);
-    const project = nodeById(layout, "project:a");
-    const linked = nodeById(layout, "note:linked");
 
-    expect(linked.y).toBeGreaterThan(project.y);
     expect(layout.nodes.some((node) => node.kind === "term")).toBe(false);
     expect(layout.links.some((link) => link.sourceId.startsWith("term:") || link.targetId.startsWith("term:"))).toBe(false);
-    expect(distanceBetween(layout, "project:a", "note:linked")).toBeLessThan(120);
+    expect(distanceBetween(layout, "profile", "note:linked")).toBeGreaterThan(distanceBetween(layout, "profile", "project:a"));
   });
 
   it("omits unlinked visual nodes so the tree stays clean", () => {
@@ -98,5 +96,16 @@ describe("layoutKnowledgeGraph", () => {
 
     expect(layout.nodes.some((node) => node.id === "skill:python")).toBe(false);
     expect(layout.nodes.every((node) => node.id === "profile" || layout.links.some((link) => link.sourceId === node.id || link.targetId === node.id))).toBe(true);
+  });
+
+  it("projects nodes away from the pointer and scales nearby nodes", () => {
+    const layout = layoutKnowledgeGraph(graph, 260, 340);
+    const project = nodeById(layout, "project:a");
+    const projected = projectKnowledgeNode(project, { x: project.x + 8, y: project.y });
+
+    expect(projected.x).toBeLessThan(project.x);
+    expect(projected.y).toBe(project.y);
+    expect(projected.scale).toBeGreaterThan(1.08);
+    expect(projected.influence).toBeGreaterThan(0.7);
   });
 });

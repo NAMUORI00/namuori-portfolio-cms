@@ -22,9 +22,9 @@ describe("KnowledgeGraphRail", () => {
 
     expect(html).toContain('aria-hidden="true"');
     expect(html).toContain("knowledge-canvas");
-    expect(html).toContain("knowledge-root-canvas");
-    expect(html).toContain("knowledge-root-spine");
-    expect(html).toContain("knowledge-root-thread");
+    expect(html).toContain("knowledge-neural-canvas");
+    expect(html).toContain("knowledge-orbit");
+    expect(html).toContain("knowledge-neural-edge");
     expect(html).toContain('class="knowledge-hit"');
     expect(html).toContain('class="knowledge-hover-layer"');
     expect(html).toContain('pointer-events="all"');
@@ -32,7 +32,9 @@ describe("KnowledgeGraphRail", () => {
     expect(html).not.toContain('data-node-id="term:rag"');
     expect(html).not.toContain('data-connects="project:a term:rag"');
     expect(html).toContain('data-edge-state="active"');
-    expect(html).toContain('knowledge-node-group[data-node-id="profile"]:hover');
+    expect(html).toContain("data-neural-node=");
+    expect(html).toContain("neuralDrift");
+    expect(html).not.toContain("knowledge-root-spine");
     expect(html).not.toContain(":has(");
     expect(html).not.toContain("nodeBreathe");
     expect(html).not.toContain('role="button"');
