@@ -185,6 +185,7 @@ export function buildKnowledgeGraph(content: PortfolioContent, options: Knowledg
   const documents = visibleDocuments(content);
   const termScores = new Map<string, number>();
   const documentTerms = new Map<string, Map<string, number>>();
+  const skillIdsByTerm = new Map<string, string>();
 
   addNode(nodes, {
     id: "profile",
@@ -217,10 +218,20 @@ export function buildKnowledgeGraph(content: PortfolioContent, options: Knowledg
 
   for (const group of content.skills) {
     for (const skill of group.items) {
-      const id = `skill:${normalizeTerm(skill)}`;
+      const skillTerm = normalizeTerm(skill);
+      const id = `skill:${skillTerm}`;
       addNode(nodes, { id, label: skill, kind: "skill", weight: 1.8, section: "skills" });
-      addLink(links, { source: "profile", target: id, kind: "skill", weight: 0.8 });
-      termScores.set(normalizeTerm(skill), (termScores.get(normalizeTerm(skill)) ?? 0) + 2);
+      skillIdsByTerm.set(skillTerm, id);
+      termScores.set(skillTerm, (termScores.get(skillTerm) ?? 0) + 2);
+    }
+  }
+
+  for (const document of documents.filter((item) => item.kind !== "note")) {
+    const counts = documentTerms.get(document.id) ?? new Map<string, number>();
+    for (const [skillTerm, skillId] of Array.from(skillIdsByTerm.entries())) {
+      const count = counts.get(skillTerm) ?? 0;
+      if (count <= 0) continue;
+      addLink(links, { source: document.id, target: skillId, kind: "skill", weight: Math.min(2.4, 1 + count / 2) });
     }
   }
 

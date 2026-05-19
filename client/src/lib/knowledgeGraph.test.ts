@@ -122,10 +122,10 @@ describe("buildKnowledgeGraph", () => {
 
     expect(graph.links).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ source: "profile", target: "skill:python", kind: "skill" }),
-        expect.objectContaining({ source: "profile", target: "skill:typescript", kind: "skill" }),
+        expect.objectContaining({ source: "project:aerospace-rag", target: "skill:python", kind: "skill" }),
       ]),
     );
+    expect(graph.links).not.toEqual(expect.arrayContaining([expect.objectContaining({ source: "profile", target: "skill:python", kind: "skill" })]));
     expect(graph.links.length).toBeLessThanOrEqual(6);
   });
 });

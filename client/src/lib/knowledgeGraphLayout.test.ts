@@ -13,7 +13,7 @@ const graph: KnowledgeGraphData = {
   ],
   links: [
     { source: "profile", target: "project:a", kind: "profile", weight: 1 },
-    { source: "profile", target: "skill:python", kind: "skill", weight: 0.8 },
+    { source: "project:a", target: "skill:python", kind: "skill", weight: 0.8 },
     { source: "project:a", target: "note:n", kind: "related", weight: 2 },
     { source: "project:a", target: "term:rag", kind: "term", weight: 1 },
   ],
@@ -43,7 +43,8 @@ describe("layoutKnowledgeGraph", () => {
     expect(profile.y).toBe(170);
     expect(distanceBetween(layout, "profile", "project:a")).toBeGreaterThanOrEqual(54);
     expect(distanceBetween(layout, "profile", "project:a")).toBeLessThanOrEqual(78);
-    expect(distanceBetween(layout, "profile", "skill:python")).toBeGreaterThanOrEqual(88);
+    expect(distanceBetween(layout, "profile", "skill:python")).toBeGreaterThan(distanceBetween(layout, "profile", "project:a"));
+    expect(distanceBetween(layout, "project:a", "skill:python")).toBeLessThanOrEqual(78);
     expect(skill.kind).toBe("skill");
     for (const node of layout.nodes) {
       expect(node.x).toBeGreaterThanOrEqual(22);
@@ -83,7 +84,7 @@ describe("layoutKnowledgeGraph", () => {
       ],
       links: [
         { source: "profile", target: "project:a", kind: "profile", weight: 1 },
-        { source: "profile", target: "skill:cuda", kind: "skill", weight: 1 },
+        { source: "project:a", target: "skill:cuda", kind: "skill", weight: 1 },
         { source: "project:a", target: "note:linked", kind: "related", weight: 2.4 },
         { source: "project:a", target: "term:linked", kind: "term", weight: 2.4 },
       ],

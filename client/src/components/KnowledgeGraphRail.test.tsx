@@ -14,7 +14,7 @@ const graph: KnowledgeGraphData = {
   ],
   links: [
     { source: "profile", target: "project:a", kind: "profile", weight: 1 },
-    { source: "profile", target: "skill:python", kind: "skill", weight: 1 },
+    { source: "project:a", target: "skill:python", kind: "skill", weight: 1 },
     { source: "project:a", target: "note:n", kind: "related", weight: 1 },
     { source: "project:a", target: "term:rag", kind: "term", weight: 1 },
   ],
@@ -34,7 +34,8 @@ describe("KnowledgeGraphRail", () => {
     expect(html).toContain('pointer-events="all"');
     expect(html).toContain('data-connects="profile project:a"');
     expect(html).toContain('data-node-id="skill:python"');
-    expect(html).toContain('data-connects="profile skill:python"');
+    expect(html).toContain('data-connects="project:a skill:python"');
+    expect(html).not.toContain('data-connects="profile skill:python"');
     expect(html).not.toContain('data-node-id="note:n"');
     expect(html).not.toContain('data-connects="project:a note:n"');
     expect(html).not.toContain('data-node-id="term:rag"');
