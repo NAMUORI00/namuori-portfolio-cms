@@ -23,6 +23,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { englishTranslations, getProfileAvatarUrl, portfolioContent } from "@/content";
 import { DARK, FONT_MONO, FONT_SANS, FONT_SERIF, LIGHT, type PortfolioTheme } from "@/content/theme";
 import { KnowledgeGraphRail } from "@/components/KnowledgeGraphRail";
+import { readAdminPreviewDraftFromLocation, withAdminPreviewUrl } from "@/lib/adminPreview";
 import { localizePortfolioContent, uiText } from "@/lib/i18nContent";
 import { buildKnowledgeGraph } from "@/lib/knowledgeGraph";
 import { activeSectionForAnchor, scrollTopForElement } from "@/lib/scroll";
@@ -298,7 +299,11 @@ export default function Home() {
   const { theme, toggleTheme } = useTheme();
   const { locale, toggleLocale } = useLanguage();
   const T = theme === "dark" ? DARK : LIGHT;
-  const content = useMemo(() => localizePortfolioContent(portfolioContent, englishTranslations, locale), [locale]);
+  const previewDraft = useMemo(() => readAdminPreviewDraftFromLocation(), []);
+  const previewId = previewDraft?.id ?? null;
+  const sourceContent = previewDraft?.content ?? portfolioContent;
+  const sourceTranslations = previewDraft?.translations ?? englishTranslations;
+  const content = useMemo(() => localizePortfolioContent(sourceContent, sourceTranslations, locale), [locale, sourceContent, sourceTranslations]);
   const IMG = content.site.images;
   const NAV_ITEMS = content.site.navigation;
   const NAV_IDS = useMemo(() => NAV_ITEMS.map((item) => item.id), [NAV_ITEMS]);
@@ -313,7 +318,8 @@ export default function Home() {
   const active = useActiveSection(NAV_IDS);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [focusedGraphNodeId, setFocusedGraphNodeId] = useState<string | null>(null);
-  const label = (key: string, fallback: string) => (locale === "en" ? uiText(englishTranslations, key, fallback) : fallback);
+  const previewHref = useCallback((path: string) => withAdminPreviewUrl(path, previewId), [previewId]);
+  const label = (key: string, fallback: string) => (locale === "en" ? uiText(sourceTranslations, key, fallback) : fallback);
   const themeToggleLabel = theme === "dark" ? label("lightMode", "라이트 모드") : label("darkMode", "다크 모드");
   const languageToggleLabel = locale === "en" ? label("languageToKorean", "한국어") : label("languageToEnglish", "English");
 
@@ -943,7 +949,7 @@ export default function Home() {
                         {proj.period}
                       </span>
                       <a
-                        href={`/projects/${proj.slug}`}
+                        href={previewHref(`/projects/${proj.slug}`)}
                         style={{
                           fontFamily: FONT_MONO,
                           fontSize: "0.62rem",
@@ -1100,7 +1106,7 @@ export default function Home() {
               © 2026 {PROFILE.name} ({PROFILE.romanizedName})
             </span>
             <a
-              href="/notes"
+              href={previewHref("/notes")}
               style={{
                 fontFamily: FONT_MONO,
                 fontSize: "0.65rem",

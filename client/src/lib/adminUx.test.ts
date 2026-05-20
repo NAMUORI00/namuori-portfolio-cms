@@ -3,6 +3,7 @@ import {
   clearDirtySection,
   clearImportApplied,
   createImportAppliedState,
+  editableListKey,
   hasDirtySection,
   isImportApplied,
   markDirtySection,
@@ -34,5 +35,11 @@ describe("admin UX helpers", () => {
     expect(applied.starred).toEqual(["vitejs/vite"]);
     expect(isImportApplied(applied, "starred", "vitejs/vite")).toBe(true);
     expect(clearImportApplied(applied, "starred").starred).toEqual([]);
+  });
+
+  it("keeps editable list keys independent from typed field values", () => {
+    expect(editableListKey("education", 1)).toBe(editableListKey("education", 1));
+    expect(editableListKey("skill-item", 2, 3)).toBe("skill-item:2:3");
+    expect(editableListKey("starred", 0)).not.toContain("repo-name");
   });
 });

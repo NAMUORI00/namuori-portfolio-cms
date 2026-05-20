@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link } from "wouter";
-import { englishTranslations, portfolioContent, type ContentOrder, type EducationEntry, type NoteEntry, type ProfileContent, type ProjectEntry, type PublicationStatus, type ResearchEntry, type SkillGroup, type StarredRepo } from "@/content";
-import { toMarkdownHtml } from "@/content/markdown";
+import { englishTranslations, portfolioContent, type ContentOrder, type EducationEntry, type NoteEntry, type PortfolioContent, type ProfileContent, type ProjectEntry, type PublicationStatus, type ResearchEntry, type SkillGroup, type StarredRepo } from "@/content";
 import { DARK, FONT_MONO, FONT_SANS, LIGHT } from "@/content/theme";
 import { useTheme } from "@/contexts/ThemeContext";
 import { adminAccessState, type AdminSessionInfo } from "@/lib/adminAccess";
 import { buildSavePayload, type SavePayload, type SaveTarget } from "@/lib/adminContent";
+import { buildAdminPreviewUrl, createAdminPreviewId, previewPathForSection, writeAdminPreviewDraft } from "@/lib/adminPreview";
 import {
   applyTranslationValues,
   buildTranslationEntries,
@@ -19,6 +19,7 @@ import {
   clearDirtySection,
   clearImportApplied,
   createImportAppliedState,
+  editableListKey,
   hasDirtySection,
   isImportApplied,
   markDirtySection,
@@ -56,7 +57,7 @@ import {
 } from "@/lib/adminItems";
 
 type SectionKey = AdminUxSectionKey;
-type EditorMode = "write" | "source" | "preview";
+type EditorMode = "write" | "source";
 type MoveDirection = "up" | "down";
 type UndoAction = { message: string; onUndo: () => void };
 
@@ -193,6 +194,8 @@ function MarkdownEditor({
   mode,
   onMode,
   onChange,
+  onPreviewClick,
+  previewUrl,
   disabled,
 }: {
   label: string;
@@ -200,6 +203,8 @@ function MarkdownEditor({
   mode: EditorMode;
   onMode: (mode: EditorMode) => void;
   onChange: (value: string) => void;
+  onPreviewClick: (event: MouseEvent<HTMLAnchorElement>) => void;
+  previewUrl: string;
   disabled?: boolean;
 }) {
   return (
@@ -207,11 +212,14 @@ function MarkdownEditor({
       <div className="admin-editor-bar">
         <span>{label}</span>
         <div>
-          {(["write", "source", "preview"] as EditorMode[]).map((item) => (
+          {(["write", "source"] as EditorMode[]).map((item) => (
             <button key={item} type="button" className={mode === item ? "active" : ""} onClick={() => onMode(item)}>
               {item}
             </button>
           ))}
+          <a href={previewUrl} target="_blank" rel="noopener noreferrer" aria-disabled={disabled} onClick={onPreviewClick}>
+            preview
+          </a>
         </div>
       </div>
       {mode === "write" && (
@@ -225,7 +233,6 @@ function MarkdownEditor({
         </div>
       )}
       {mode === "source" && <textarea disabled={disabled} rows={12} value={body} onChange={(event) => onChange(event.target.value)} />}
-      {mode === "preview" && <div className="admin-preview" dangerouslySetInnerHTML={{ __html: toMarkdownHtml(body) }} />}
     </div>
   );
 }
@@ -257,6 +264,7 @@ export default function Admin() {
   const [dirtySections, setDirtySections] = useState<SectionKey[]>([]);
   const [appliedImport, setAppliedImport] = useState<ImportAppliedState>(() => createImportAppliedState());
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const [previewId] = useState(() => createAdminPreviewId());
 
   const access = adminAccessState(session, localPreview);
   const canEdit = access === "granted";
@@ -303,6 +311,32 @@ export default function Admin() {
   const activeDirty = hasDirtySection(dirtySections, active);
   const dirtySectionLabels = dirtySections.map(sectionLabel).join(", ");
   const currentScope = saveScopeSummary(active, savePayload.branch);
+  const previewContent = useMemo<PortfolioContent>(
+    () => ({
+      ...portfolioContent,
+      profile,
+      education,
+      research,
+      projects,
+      skills,
+      starred,
+      notes,
+    }),
+    [education, notes, profile, projects, research, skills, starred],
+  );
+  const previewSlug = active === "projects" ? projects[projectIndex]?.slug : active === "research" ? research[researchIndex]?.slug : active === "notes" ? notes[noteIndex]?.slug : undefined;
+  const adminPreviewUrl = useMemo(() => buildAdminPreviewUrl(previewPathForSection(active, { slug: previewSlug }), previewId, "ko"), [active, previewId, previewSlug]);
+
+  useEffect(() => {
+    if (!canEdit) return;
+    writeAdminPreviewDraft({
+      id: previewId,
+      createdAt: new Date().toISOString(),
+      section: active,
+      content: previewContent,
+      translations: enTranslations,
+    });
+  }, [active, canEdit, enTranslations, previewContent, previewId]);
 
   function markSectionDirty(section: SectionKey) {
     setDirtySections((items) => markDirtySection(items, section));
@@ -329,6 +363,14 @@ export default function Admin() {
   function updateProfile(next: Partial<ProfileContent>) {
     setProfile((current) => ({ ...current, ...next }));
     markSectionDirty("profile");
+  }
+
+  function handlePreviewClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (!canEdit) {
+      event.preventDefault();
+      return;
+    }
+    setStatus("새 탭에서 배포 화면 기준 미리보기를 열었습니다. 저장 전 초안은 이 브라우저에서만 보입니다.");
   }
 
   async function postJson(path: string, payload: unknown) {
@@ -974,7 +1016,7 @@ export default function Admin() {
             <ControlButton disabled={!canEdit} onClick={addEducationEntry}>Add timeline</ControlButton>
           </div>
           {education.map((item, index) => (
-            <div className="admin-card" key={`${item.degree}-${index}`}>
+            <div className="admin-card" key={editableListKey("education", index)}>
               <div className="admin-card-head">
                 <strong>{item.degree || "Timeline item"}</strong>
                 <div className="admin-card-actions">
@@ -1034,7 +1076,7 @@ export default function Admin() {
             <Field disabled={!canEdit} label="Tags" value={project.tags.join(", ")} onChange={(value) => updateProject({ tags: splitList(value) })} />
             <Field disabled={!canEdit} label="Related notes" value={project.relatedNotes.join(", ")} onChange={(value) => updateProject({ relatedNotes: splitList(value) })} />
           </div>
-          <MarkdownEditor disabled={!canEdit} label="Project body" body={project.body} mode={mode} onMode={setMode} onChange={(body) => updateProject({ body })} />
+          <MarkdownEditor disabled={!canEdit} label="Project body" body={project.body} mode={mode} onMode={setMode} onChange={(body) => updateProject({ body })} onPreviewClick={handlePreviewClick} previewUrl={adminPreviewUrl} />
           {renderTranslationPanel()}
         </div>
       );
@@ -1071,7 +1113,7 @@ export default function Admin() {
             <TextArea disabled={!canEdit} label="Description" value={item.desc} onChange={(desc) => updateResearch({ desc })} rows={4} />
             <Field disabled={!canEdit} label="Related notes" value={item.relatedNotes.join(", ")} onChange={(value) => updateResearch({ relatedNotes: splitList(value) })} />
           </div>
-          <MarkdownEditor disabled={!canEdit} label="Research body" body={item.body} mode={mode} onMode={setMode} onChange={(body) => updateResearch({ body })} />
+          <MarkdownEditor disabled={!canEdit} label="Research body" body={item.body} mode={mode} onMode={setMode} onChange={(body) => updateResearch({ body })} onPreviewClick={handlePreviewClick} previewUrl={adminPreviewUrl} />
           {renderTranslationPanel()}
         </div>
       );
@@ -1084,7 +1126,7 @@ export default function Admin() {
             <ControlButton disabled={!canEdit} onClick={addSkillGroup}>Add group</ControlButton>
           </div>
           {skills.map((group, index) => (
-            <div className="admin-card" key={`${group.label}-${index}`}>
+            <div className="admin-card" key={editableListKey("skill-group", index)}>
               <div className="admin-card-head">
                 <strong>{group.label || "Skill group"}</strong>
                 <div className="admin-card-actions">
@@ -1097,7 +1139,7 @@ export default function Admin() {
               <div className="admin-inline-list">
                 <span>Items</span>
                 {group.items.map((skill, itemIndex) => (
-                  <div className="admin-inline-row" key={`${skill}-${itemIndex}`}>
+                  <div className="admin-inline-row" key={editableListKey("skill-item", index, itemIndex)}>
                     <input disabled={!canEdit} value={skill} onChange={(event) => updateSkillItem(index, itemIndex, event.target.value)} />
                     <ControlButton disabled={!canEdit || itemIndex === 0} onClick={() => moveSkillItem(index, itemIndex, "up")}>Up</ControlButton>
                     <ControlButton disabled={!canEdit || itemIndex === group.items.length - 1} onClick={() => moveSkillItem(index, itemIndex, "down")}>Down</ControlButton>
@@ -1119,7 +1161,7 @@ export default function Admin() {
             <ControlButton disabled={!canEdit} onClick={addStarredRepo}>Add repository</ControlButton>
           </div>
           {starred.map((repo, index) => (
-            <div className="admin-card" key={`${repo.name}-${index}`}>
+            <div className="admin-card" key={editableListKey("starred", index)}>
               <div className="admin-card-head">
                 <strong>{repo.name || "Repository"}</strong>
                 <div className="admin-card-actions">
@@ -1171,7 +1213,7 @@ export default function Admin() {
           <Field disabled={!canEdit} label="Related projects" value={note.relatedProjects.join(", ")} onChange={(value) => updateNote({ relatedProjects: splitList(value) })} />
           <Field disabled={!canEdit} label="Related research" value={note.relatedResearch.join(", ")} onChange={(value) => updateNote({ relatedResearch: splitList(value) })} />
         </div>
-        <MarkdownEditor disabled={!canEdit} label="Note body" body={note.body} mode={mode} onMode={setMode} onChange={(body) => updateNote({ body })} />
+        <MarkdownEditor disabled={!canEdit} label="Note body" body={note.body} mode={mode} onMode={setMode} onChange={(body) => updateNote({ body })} onPreviewClick={handlePreviewClick} previewUrl={adminPreviewUrl} />
         {renderTranslationPanel()}
       </div>
     );
@@ -1249,6 +1291,7 @@ export default function Admin() {
               {!session?.authenticated && !localPreview && <a href="/api/auth/login">GitHub Login</a>}
               {!session?.authenticated && import.meta.env.DEV && !localPreview && <a href="/admin?demo=1">Local Preview</a>}
               {session?.authenticated && <a href="/api/auth/logout">Logout</a>}
+              <a href={adminPreviewUrl} target="_blank" rel="noopener noreferrer" aria-disabled={!canEdit} onClick={handlePreviewClick}>Preview</a>
               <button type="button" disabled={!canEdit} onClick={saveDraft}>{sectionActionLabel(active, "save")}</button>
               <button type="button" disabled={!canEdit} onClick={publishDraft}>{sectionActionLabel(active, "publish")}</button>
             </div>
@@ -1272,7 +1315,7 @@ export default function Admin() {
         .admin-sidebar p, .admin-header p { color: ${T.sub}; margin: 0; line-height: 1.6; }
         .admin-back { font-family: ${FONT_MONO}; font-size: .75rem; text-decoration: none; }
         .admin-sidebar nav { display: grid; gap: 4px; margin-top: 28px; }
-        .admin-sidebar button, .admin-actions button, .admin-actions a, .admin-editor-bar button,
+        .admin-sidebar button, .admin-actions button, .admin-actions a, .admin-editor-bar button, .admin-editor-bar a,
         .admin-toolbar button, .admin-card-actions button, .admin-inline-list button, .admin-import button, .admin-candidate button, .admin-undo-toast button, .admin-translation button {
           border: 1px solid ${T.border}; background: ${T.surface}; color: ${T.sub};
           border-radius: 4px; padding: 8px 10px; font-family: ${FONT_MONO}; cursor: pointer; text-decoration: none;
@@ -1281,7 +1324,7 @@ export default function Admin() {
         .admin-sidebar button.active, .admin-editor-bar button.active { color: ${T.green}; border-color: ${T.green}; background: ${T.greenBg}; }
         .admin-sidebar button.dirty { border-color: ${T.green}; }
         .admin-dirty-dot { width: 7px; height: 7px; border-radius: 999px; background: ${T.green}; box-shadow: 0 0 0 3px ${T.greenBg}; flex: 0 0 auto; }
-        .admin-actions button:disabled, .admin-toolbar button:disabled, .admin-card-actions button:disabled, .admin-inline-list button:disabled, .admin-import button:disabled, .admin-candidate button:disabled, .admin-translation button:disabled { opacity: .45; cursor: not-allowed; }
+        .admin-actions button:disabled, .admin-actions a[aria-disabled="true"], .admin-editor-bar button:disabled, .admin-editor-bar a[aria-disabled="true"], .admin-toolbar button:disabled, .admin-card-actions button:disabled, .admin-inline-list button:disabled, .admin-import button:disabled, .admin-candidate button:disabled, .admin-translation button:disabled { opacity: .45; cursor: not-allowed; }
         .admin-toolbar button.danger, .admin-card-actions button.danger, .admin-inline-list button.danger { color: ${T.red}; border-color: ${T.red}; background: ${T.redBg}; }
         .admin-main { border-left: 0; min-width: 0; padding: 28px; }
         .admin-header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 22px; }
@@ -1345,8 +1388,7 @@ export default function Admin() {
         .admin-editor { display: grid; gap: 10px; }
         .admin-editor-bar { display: flex; justify-content: space-between; align-items: center; color: ${T.sub}; font-family: ${FONT_MONO}; font-size: .78rem; }
         .admin-editor-bar div { display: flex; gap: 6px; }
-        .admin-wysiwyg, .admin-preview { min-height: 240px; white-space: pre-wrap; }
-        .admin-preview { border: 1px solid ${T.border}; background: ${T.surface}; border-radius: 4px; padding: 12px; color: ${T.sub}; }
+        .admin-wysiwyg { min-height: 240px; white-space: pre-wrap; }
         @media (max-width: 860px) {
           .admin-shell { grid-template-columns: 1fr; }
           .admin-sidebar { border-right: 0; border-bottom: 1px solid; }

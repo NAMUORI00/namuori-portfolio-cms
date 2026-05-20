@@ -32,6 +32,10 @@ export function saveScopeSummary(section: AdminUxSectionKey, branch: string): st
   return `Current target: ${sectionLabel(section)} · ${branch}`;
 }
 
+export function editableListKey(scope: string, index: number, nestedIndex?: number): string {
+  return nestedIndex === undefined ? `${scope}:${index}` : `${scope}:${index}:${nestedIndex}`;
+}
+
 export function hasDirtySection(dirtySections: AdminUxSectionKey[], section: AdminUxSectionKey): boolean {
   return dirtySections.includes(section);
 }

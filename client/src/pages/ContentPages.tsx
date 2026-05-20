@@ -5,24 +5,30 @@ import { toMarkdownHtml } from "@/content/markdown";
 import { DARK, FONT_MONO, FONT_SANS, LIGHT } from "@/content/theme";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { readAdminPreviewDraftFromLocation, withAdminPreviewUrl } from "@/lib/adminPreview";
 import { localizePortfolioContent, uiText } from "@/lib/i18nContent";
 
 function usePalette() {
   const { theme, toggleTheme } = useTheme();
   const { locale, toggleLocale } = useLanguage();
-  const content = useMemo(() => localizePortfolioContent(portfolioContent, englishTranslations, locale), [locale]);
-  const label = (key: string, fallback: string) => (locale === "en" ? uiText(englishTranslations, key, fallback) : fallback);
-  return { T: theme === "dark" ? DARK : LIGHT, theme, toggleTheme, locale, toggleLocale, content, label };
+  const previewDraft = useMemo(() => readAdminPreviewDraftFromLocation(), []);
+  const previewId = previewDraft?.id ?? null;
+  const sourceContent = previewDraft?.content ?? portfolioContent;
+  const sourceTranslations = previewDraft?.translations ?? englishTranslations;
+  const content = useMemo(() => localizePortfolioContent(sourceContent, sourceTranslations, locale), [locale, sourceContent, sourceTranslations]);
+  const label = (key: string, fallback: string) => (locale === "en" ? uiText(sourceTranslations, key, fallback) : fallback);
+  const previewHref = (path: string) => withAdminPreviewUrl(path, previewId);
+  return { T: theme === "dark" ? DARK : LIGHT, theme, toggleTheme, locale, toggleLocale, content, label, previewHref };
 }
 
 function PageFrame({ children, title }: { children: React.ReactNode; title: string }) {
-  const { T, theme, toggleTheme, locale, toggleLocale, label } = usePalette();
+  const { T, theme, toggleTheme, locale, toggleLocale, label, previewHref } = usePalette();
   return (
     <main style={{ minHeight: "100dvh", background: T.bg, color: T.text, fontFamily: FONT_SANS }}>
       <div style={{ maxWidth: "880px", margin: "0 auto", padding: "32px 24px 56px" }}>
         <header style={{ display: "flex", justifyContent: "space-between", gap: "16px", marginBottom: "32px" }}>
           <div>
-            <Link href="/" style={{ color: T.green, fontFamily: FONT_MONO, fontSize: "0.75rem", textDecoration: "none" }}>
+            <Link href={previewHref("/")} style={{ color: T.green, fontFamily: FONT_MONO, fontSize: "0.75rem", textDecoration: "none" }}>
               ← {label("portfolio", "Portfolio")}
             </Link>
             <h1 style={{ margin: "14px 0 0", fontSize: "2rem", lineHeight: 1.3 }}>{title}</h1>
@@ -78,7 +84,7 @@ function MarkdownBody({ markdown }: { markdown: string }) {
 }
 
 export function Notes() {
-  const { T, content } = usePalette();
+  const { T, content, previewHref } = usePalette();
   const notes = content.notes.filter((note) => note.status === "published");
   return (
     <PageFrame title="Notes">
@@ -86,7 +92,7 @@ export function Notes() {
         {notes.map((note) => (
           <Link
             key={note.slug}
-            href={`/notes/${note.slug}`}
+            href={previewHref(`/notes/${note.slug}`)}
             style={{
               display: "block",
               padding: "18px 20px",
