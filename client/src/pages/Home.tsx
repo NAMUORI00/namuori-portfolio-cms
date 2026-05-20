@@ -24,6 +24,7 @@ import { englishTranslations, getProfileAvatarUrl, portfolioContent } from "@/co
 import { DARK, FONT_MONO, FONT_SANS, FONT_SERIF, LIGHT, type PortfolioTheme } from "@/content/theme";
 import { KnowledgeGraphRail } from "@/components/KnowledgeGraphRail";
 import { readAdminPreviewDraftFromLocation, withAdminPreviewUrl } from "@/lib/adminPreview";
+import { buildCoverPreview, type CoverPreviewPayload } from "@/lib/coverPreview";
 import { localizePortfolioContent, uiText } from "@/lib/i18nContent";
 import { buildKnowledgeGraph } from "@/lib/knowledgeGraph";
 import { activeSectionForAnchor, scrollEndPaddingForCenteredSection, scrollTopForElementCenter } from "@/lib/scroll";
@@ -368,10 +369,27 @@ export default function Home() {
   const scrollEndPadding = useScrollEndPadding("interests");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [focusedGraphNodeId, setFocusedGraphNodeId] = useState<string | null>(null);
+  const [coverPreview, setCoverPreview] = useState<CoverPreviewPayload | null>(null);
   const previewHref = useCallback((path: string) => withAdminPreviewUrl(path, previewId), [previewId]);
   const label = (key: string, fallback: string) => (locale === "en" ? uiText(sourceTranslations, key, fallback) : fallback);
   const themeToggleLabel = theme === "dark" ? label("lightMode", "라이트 모드") : label("darkMode", "다크 모드");
   const languageToggleLabel = locale === "en" ? label("languageToKorean", "한국어") : label("languageToEnglish", "English");
+
+  useEffect(() => {
+    if (!coverPreview) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCoverPreview(null);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [coverPreview]);
 
   const scrollTo = useCallback((id: string) => {
     const el = document.getElementById(id);
@@ -870,15 +888,7 @@ export default function Home() {
                     onMouseEnter={(e) => (e.currentTarget.style.borderLeftColor = T.green)}
                     onMouseLeave={(e) => (e.currentTarget.style.borderLeftColor = T.border)}
                   >
-                    {r.coverImage && (
-                      <img
-                        src={r.coverImage}
-                        alt={locale === "en" ? `${r.title} research cover` : `${r.title} 연구 대표 이미지`}
-                        className="content-cover-thumb research-cover-thumb"
-                        style={{ borderColor: T.border, background: T.surface }}
-                      />
-                    )}
-                    <div>
+                    <div className="research-copy">
                       <div style={{
                         fontFamily: FONT_SANS,
                         fontSize: "0.88rem",
@@ -898,6 +908,24 @@ export default function Home() {
                         {r.desc}
                       </div>
                     </div>
+                    {r.coverImage && (() => {
+                      const preview = buildCoverPreview({ locale, kind: "research", title: r.title, src: r.coverImage });
+                      return (
+                        <button
+                          type="button"
+                          className="content-cover-button research-cover-button"
+                          aria-label={preview.actionLabel}
+                          onClick={() => setCoverPreview(preview)}
+                        >
+                          <img
+                            src={preview.src}
+                            alt={preview.alt}
+                            className="content-cover-thumb research-cover-thumb"
+                            style={{ borderColor: T.border, background: T.surface }}
+                          />
+                        </button>
+                      );
+                    })()}
                   </div>
                   {/* RAG 다이어그램 이미지 */}
                   {r.showDiagram && (
@@ -972,14 +1000,6 @@ export default function Home() {
                     }}
                   >
                     <div className={proj.coverImage ? "project-content has-cover" : "project-content"}>
-                      {proj.coverImage && (
-                        <img
-                          src={proj.coverImage}
-                          alt={locale === "en" ? `${proj.name} project cover` : `${proj.name} 프로젝트 대표 이미지`}
-                          className="content-cover-thumb project-cover-thumb"
-                          style={{ borderColor: T.border, background: T.bg }}
-                        />
-                      )}
                       <div className="project-copy">
                         {/* 헤더 */}
                         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
@@ -1067,6 +1087,24 @@ export default function Home() {
                           {proj.tags.map((tag) => <Tag key={tag} T={T}>{tag}</Tag>)}
                         </div>
                       </div>
+                      {proj.coverImage && (() => {
+                        const preview = buildCoverPreview({ locale, kind: "project", title: proj.name, src: proj.coverImage });
+                        return (
+                          <button
+                            type="button"
+                            className="content-cover-button project-cover-button"
+                            aria-label={preview.actionLabel}
+                            onClick={() => setCoverPreview(preview)}
+                          >
+                            <img
+                              src={preview.src}
+                              alt={preview.alt}
+                              className="content-cover-thumb project-cover-thumb"
+                              style={{ borderColor: T.border, background: T.bg }}
+                            />
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
@@ -1218,6 +1256,29 @@ export default function Home() {
 
       <KnowledgeGraphRail graph={KNOWLEDGE_GRAPH} T={T} active={active} focusNodeId={focusedGraphNodeId} />
 
+      {coverPreview && (
+        <div
+          className="cover-preview-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={coverPreview.dialogLabel}
+          onClick={() => setCoverPreview(null)}
+        >
+          <figure className="cover-preview-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="cover-preview-close"
+              aria-label={coverPreview.closeLabel}
+              onClick={() => setCoverPreview(null)}
+            >
+              ×
+            </button>
+            <img src={coverPreview.src} alt={coverPreview.alt} />
+            <figcaption>{coverPreview.title}</figcaption>
+          </figure>
+        </div>
+      )}
+
       {/* ── 전역 스타일 ── */}
       <style>{`
         * {
@@ -1251,8 +1312,8 @@ export default function Home() {
         }
         .research-card.has-cover {
           display: grid;
-          grid-template-columns: minmax(120px, 28%) minmax(0, 1fr);
-          gap: 0.9rem;
+          grid-template-columns: minmax(0, 1fr) clamp(76px, 12vw, 108px);
+          gap: 0.75rem;
           align-items: start;
         }
         .project-content {
@@ -1262,9 +1323,12 @@ export default function Home() {
         }
         .project-content.has-cover {
           display: grid;
-          grid-template-columns: minmax(130px, 26%) minmax(0, 1fr);
-          gap: 0.9rem;
+          grid-template-columns: minmax(0, 1fr) clamp(84px, 13vw, 124px);
+          gap: 0.85rem;
           align-items: start;
+        }
+        .research-copy {
+          min-width: 0;
         }
         .project-copy {
           display: flex;
@@ -1272,19 +1336,108 @@ export default function Home() {
           gap: 0.4rem;
           min-width: 0;
         }
+        .content-cover-button {
+          appearance: none;
+          border: 0;
+          border-radius: 4px;
+          background: transparent;
+          padding: 0;
+          margin: 0;
+          cursor: zoom-in;
+          justify-self: end;
+          align-self: start;
+          width: 100%;
+          max-width: 124px;
+          color: inherit;
+        }
+        .research-cover-button {
+          max-width: 108px;
+        }
+        .project-cover-button {
+          max-width: 124px;
+        }
+        .content-cover-button:focus-visible {
+          outline: 2px solid ${T.green};
+          outline-offset: 3px;
+        }
         .content-cover-thumb {
           width: 100%;
-          aspect-ratio: 16 / 10;
+          aspect-ratio: 1 / 1;
           border: 1px solid;
           border-radius: 4px;
           object-fit: cover;
           display: block;
+          opacity: 0.82;
+          transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
         }
         .research-cover-thumb {
-          min-height: 96px;
+          min-height: 76px;
         }
         .project-cover-thumb {
-          min-height: 112px;
+          min-height: 84px;
+        }
+        .content-cover-button:hover .content-cover-thumb,
+        .content-cover-button:focus-visible .content-cover-thumb {
+          border-color: ${T.green} !important;
+          box-shadow: 0 10px 24px ${T.green}24;
+          opacity: 1;
+          transform: scale(1.045);
+        }
+        .cover-preview-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 360;
+          display: grid;
+          place-items: center;
+          padding: clamp(1rem, 4vw, 3rem);
+          background: rgba(0, 0, 0, ${theme === "dark" ? "0.66" : "0.52"});
+          backdrop-filter: blur(3px);
+        }
+        .cover-preview-modal {
+          position: relative;
+          width: min(920px, 92vw);
+          max-height: min(760px, 88dvh);
+          margin: 0;
+          padding: clamp(0.75rem, 2vw, 1rem);
+          border: 1px solid ${T.border};
+          border-radius: 6px;
+          background: ${T.surface};
+          box-shadow: 0 24px 80px rgba(0, 0, 0, ${theme === "dark" ? "0.5" : "0.28"});
+        }
+        .cover-preview-modal img {
+          width: 100%;
+          max-height: min(660px, 72dvh);
+          object-fit: contain;
+          display: block;
+          border-radius: 4px;
+          background: ${T.bg};
+        }
+        .cover-preview-modal figcaption {
+          margin-top: 0.65rem;
+          font-family: ${FONT_SANS};
+          font-size: 0.82rem;
+          color: ${T.sub};
+          line-height: 1.5;
+        }
+        .cover-preview-close {
+          position: absolute;
+          top: 0.65rem;
+          right: 0.65rem;
+          width: 30px;
+          height: 30px;
+          border: 1px solid ${T.border};
+          border-radius: 50%;
+          background: ${T.surface};
+          color: ${T.text};
+          font-size: 1.25rem;
+          line-height: 1;
+          cursor: pointer;
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+        }
+        .cover-preview-close:hover,
+        .cover-preview-close:focus-visible {
+          border-color: ${T.green};
+          color: ${T.green};
         }
         @media (max-width: 1180px) {
           #knowledge-rail { display: none !important; }
@@ -1296,7 +1449,15 @@ export default function Home() {
           .scroll-inner { padding: 2rem 1.5rem 3rem !important; }
           .research-card.has-cover,
           .project-content.has-cover { grid-template-columns: 1fr; }
-          .content-cover-thumb { max-height: 220px; }
+          .content-cover-button {
+            justify-self: start;
+            width: min(38vw, 116px);
+            max-width: 116px;
+          }
+          .cover-preview-modal {
+            width: 94vw;
+            padding: 0.65rem;
+          }
         }
         .mobile-overlay {
           display: none;
