@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type MouseEvent, type ReactNode } from "react";
 import { Link } from "wouter";
-import { englishTranslations, portfolioContent, type ContentOrder, type EducationEntry, type NoteEntry, type PortfolioContent, type ProfileContent, type ProjectEntry, type PublicationStatus, type ResearchEntry, type SkillGroup, type StarredRepo } from "@/content";
+import { englishTranslations, getProfileAvatarUrl, portfolioContent, type ContentOrder, type EducationEntry, type NoteEntry, type PortfolioContent, type ProfileContent, type ProjectEntry, type PublicationStatus, type ResearchEntry, type SkillGroup, type StarredRepo } from "@/content";
 import { DARK, FONT_MONO, FONT_SANS, LIGHT } from "@/content/theme";
 import { useTheme } from "@/contexts/ThemeContext";
 import { adminAccessState, type AdminSessionInfo } from "@/lib/adminAccess";
-import { buildSavePayload, type SavePayload, type SaveTarget } from "@/lib/adminContent";
+import { appendSaveFiles, buildSavePayload, type SavePayload, type SaveTarget } from "@/lib/adminContent";
 import { buildAdminPreviewUrl, createAdminPreviewId, previewPathForSection, writeAdminPreviewDraft } from "@/lib/adminPreview";
+import { avatarUploadDraftFromDataUrl, type AvatarUploadDraft } from "@/lib/avatarUpload";
 import {
   applyTranslationValues,
   buildTranslationEntries,
@@ -62,6 +63,7 @@ type SectionKey = AdminUxSectionKey;
 type EditorMode = "write" | "source";
 type MoveDirection = "up" | "down";
 type UndoAction = { message: string; onUndo: () => void };
+type PendingAvatarUpload = AvatarUploadDraft & { fileName: string; previewUrl: string };
 
 const SECTIONS: Array<{ key: SectionKey; label: string }> = [
   { key: "profile", label: "Profile" },
@@ -190,6 +192,15 @@ function ControlButton({
   );
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => (typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("아바타 이미지 파일을 읽지 못했습니다.")));
+    reader.onerror = () => reject(new Error("아바타 이미지 파일을 읽지 못했습니다."));
+    reader.readAsDataURL(file);
+  });
+}
+
 function MarkdownEditor({
   label,
   body,
@@ -281,6 +292,7 @@ export default function Admin() {
   const [translationDraftReady, setTranslationDraftReady] = useState(false);
   const [appliedImport, setAppliedImport] = useState<ImportAppliedState>(() => createImportAppliedState());
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const [avatarUpload, setAvatarUpload] = useState<PendingAvatarUpload | null>(null);
   const [previewId] = useState(() => createAdminPreviewId());
 
   const access = adminAccessState(session, localPreview);
@@ -312,7 +324,11 @@ export default function Admin() {
     return { kind: "note", value: notes[noteIndex], order: contentOrder };
   }, [active, contentOrder, education, noteIndex, notes, profile, projectIndex, projects, research, researchIndex, skills, starred]);
 
-  const savePayload = useMemo<SavePayload>(() => buildSavePayload(target), [target]);
+  const baseSavePayload = useMemo<SavePayload>(() => buildSavePayload(target), [target]);
+  const savePayload = useMemo<SavePayload>(() => {
+    if (active === "profile" && avatarUpload) return appendSaveFiles(baseSavePayload, [avatarUpload.file]);
+    return baseSavePayload;
+  }, [active, avatarUpload, baseSavePayload]);
   const translationSource = useMemo<TranslationSource | null>(() => {
     if (active === "profile") return { kind: "profile", value: profile };
     if (active === "projects" && projects[projectIndex]) return { kind: "project", value: projects[projectIndex] };
@@ -329,10 +345,14 @@ export default function Admin() {
   const activeDraftReady = hasDirtySection(readyDraftSections, active);
   const dirtySectionLabels = dirtySections.map(sectionLabel).join(", ");
   const currentScope = saveScopeSummary(active, savePayload.branch);
+  const previewProfile = useMemo<ProfileContent>(
+    () => (avatarUpload ? { ...profile, avatarUrl: avatarUpload.previewUrl } : profile),
+    [avatarUpload, profile],
+  );
   const previewContent = useMemo<PortfolioContent>(
     () => ({
       ...portfolioContent,
-      profile,
+      profile: previewProfile,
       education,
       research,
       projects,
@@ -340,7 +360,7 @@ export default function Admin() {
       starred,
       notes,
     }),
-    [education, notes, profile, projects, research, skills, starred],
+    [education, notes, previewProfile, projects, research, skills, starred],
   );
   const previewSlug = active === "projects" ? projects[projectIndex]?.slug : active === "research" ? research[researchIndex]?.slug : active === "notes" ? notes[noteIndex]?.slug : undefined;
   const adminPreviewUrl = useMemo(() => buildAdminPreviewUrl(previewPathForSection(active, { slug: previewSlug }), previewId, "ko"), [active, previewId, previewSlug]);
@@ -391,6 +411,32 @@ export default function Admin() {
   function updateProfile(next: Partial<ProfileContent>) {
     setProfile((current) => ({ ...current, ...next }));
     markSectionDirty("profile");
+  }
+
+  function updateAvatarUrl(avatarUrl: string) {
+    setAvatarUpload(null);
+    updateProfile({ avatarUrl });
+  }
+
+  async function handleAvatarUploadChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const draft = avatarUploadDraftFromDataUrl(file, dataUrl);
+      setAvatarUpload({ ...draft, fileName: file.name, previewUrl: dataUrl });
+      updateProfile({ avatarUrl: draft.publicUrl });
+      setStatus(`${file.name} 업로드 준비 완료: 저장하면 ${draft.file.path}에 함께 커밋됩니다.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "아바타 이미지를 불러오지 못했습니다.");
+    }
+  }
+
+  function useGitHubAvatar() {
+    setAvatarUpload(null);
+    updateProfile({ avatarUrl: "" });
+    setStatus("GitHub 기본 프로필 이미지를 사용하도록 설정했습니다. 저장하면 profile.json에 반영됩니다.");
   }
 
   function handlePreviewClick(event: MouseEvent<HTMLAnchorElement>) {
@@ -561,6 +607,7 @@ export default function Admin() {
     if (localPreview && !session?.authenticated) {
       clearSavedSection(active);
       markSectionDraftReady(active);
+      if (active === "profile") setAvatarUpload(null);
       setStatus(`로컬 미리보기: ${savePayload.branch}에 ${savePayload.files.length}개 파일을 저장할 준비가 됐습니다.`);
       return;
     }
@@ -569,6 +616,7 @@ export default function Admin() {
       const result = await postJson("/api/github/save", savePayload);
       clearSavedSection(active);
       markSectionDraftReady(active);
+      if (active === "profile") setAvatarUpload(null);
       setStatus(`저장 완료: ${result.branch || savePayload.branch}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -1038,7 +1086,26 @@ export default function Admin() {
             <Field disabled={!canEdit} label="Name" value={profile.name} onChange={(name) => updateProfile({ name })} />
             <Field disabled={!canEdit} label="Handle" value={profile.handle} onChange={(handle) => updateProfile({ handle })} />
             <Field disabled={!canEdit} label="Status" value={profile.status} onChange={(status) => updateProfile({ status })} />
-            <Field disabled={!canEdit} label="Avatar URL" value={profile.avatarUrl ?? ""} onChange={(avatarUrl) => updateProfile({ avatarUrl })} />
+            <Field disabled={!canEdit} label="Avatar URL" value={profile.avatarUrl ?? ""} onChange={updateAvatarUrl} />
+            <div className="admin-avatar-card">
+              <img className="admin-avatar-preview" src={avatarUpload?.previewUrl ?? getProfileAvatarUrl(profile)} alt={`${profile.name} avatar preview`} />
+              <div className="admin-avatar-body">
+                <span className="admin-kicker">avatar image</span>
+                <strong>{avatarUpload ? avatarUpload.fileName : profile.avatarUrl?.trim() ? "Custom avatar URL" : "GitHub profile avatar"}</strong>
+                <p>
+                  {avatarUpload
+                    ? `${avatarUpload.publicUrl}로 저장 준비됨 · Save Profile draft를 누르면 이미지 파일도 함께 커밋됩니다.`
+                    : "파일을 업로드하거나 URL을 직접 입력할 수 있습니다. 비워두면 GitHub 프로필 이미지를 사용합니다."}
+                </p>
+                <div className="admin-avatar-actions">
+                  <label className="admin-file-button" aria-disabled={!canEdit}>
+                    Upload image
+                    <input disabled={!canEdit} accept="image/png,image/jpeg,image/webp" type="file" onChange={handleAvatarUploadChange} />
+                  </label>
+                  <ControlButton disabled={!canEdit} onClick={useGitHubAvatar}>Use GitHub avatar</ControlButton>
+                </div>
+              </div>
+            </div>
             <TextArea disabled={!canEdit} label="Headline" value={profile.headline} onChange={(headline) => updateProfile({ headline })} rows={3} />
             <TextArea disabled={!canEdit} label="Lead" value={profile.summaryLead} onChange={(summaryLead) => updateProfile({ summaryLead })} rows={4} />
             <TextArea disabled={!canEdit} label="Summary paragraphs" value={profile.summary.join("\n\n")} onChange={(value) => updateProfile({ summary: value.split(/\n\s*\n/).filter(Boolean) })} rows={8} />
@@ -1353,7 +1420,7 @@ export default function Admin() {
         .admin-sidebar p, .admin-header p { color: ${T.sub}; margin: 0; line-height: 1.6; }
         .admin-back { font-family: ${FONT_MONO}; font-size: .75rem; text-decoration: none; }
         .admin-sidebar nav { display: grid; gap: 4px; margin-top: 28px; }
-        .admin-sidebar button, .admin-actions button, .admin-actions a, .admin-editor-bar button, .admin-editor-bar a,
+        .admin-sidebar button, .admin-actions button, .admin-actions a, .admin-editor-bar button, .admin-editor-bar a, .admin-file-button,
         .admin-toolbar button, .admin-card-actions button, .admin-inline-list button, .admin-import button, .admin-candidate button, .admin-undo-toast button, .admin-translation button {
           border: 1px solid ${T.border}; background: ${T.surface}; color: ${T.sub};
           border-radius: 4px; padding: 8px 10px; font-family: ${FONT_MONO}; cursor: pointer; text-decoration: none;
@@ -1362,7 +1429,7 @@ export default function Admin() {
         .admin-sidebar button.active, .admin-editor-bar button.active { color: ${T.green}; border-color: ${T.green}; background: ${T.greenBg}; }
         .admin-sidebar button.dirty { border-color: ${T.green}; }
         .admin-dirty-dot { width: 7px; height: 7px; border-radius: 999px; background: ${T.green}; box-shadow: 0 0 0 3px ${T.greenBg}; flex: 0 0 auto; }
-        .admin-actions button:disabled, .admin-actions a[aria-disabled="true"], .admin-editor-bar button:disabled, .admin-editor-bar a[aria-disabled="true"], .admin-toolbar button:disabled, .admin-card-actions button:disabled, .admin-inline-list button:disabled, .admin-import button:disabled, .admin-candidate button:disabled, .admin-translation button:disabled { opacity: .45; cursor: not-allowed; }
+        .admin-actions button:disabled, .admin-actions a[aria-disabled="true"], .admin-editor-bar button:disabled, .admin-editor-bar a[aria-disabled="true"], .admin-file-button[aria-disabled="true"], .admin-toolbar button:disabled, .admin-card-actions button:disabled, .admin-inline-list button:disabled, .admin-import button:disabled, .admin-candidate button:disabled, .admin-translation button:disabled { opacity: .45; cursor: not-allowed; }
         .admin-toolbar button.danger, .admin-card-actions button.danger, .admin-inline-list button.danger { color: ${T.red}; border-color: ${T.red}; background: ${T.redBg}; }
         .admin-main { border-left: 0; min-width: 0; padding: 28px; }
         .admin-header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 22px; }
@@ -1412,6 +1479,21 @@ export default function Admin() {
         .admin-translation-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
         .admin-translation-field { display: grid; gap: 6px; color: ${T.sub}; font-family: ${FONT_MONO}; font-size: .76rem; }
         .admin-translation-field small { min-height: 3.2em; color: ${T.muted}; font-family: ${FONT_SANS}; line-height: 1.6; }
+        .admin-avatar-card {
+          grid-column: 1 / -1; border: 1px solid ${T.border}; background: ${T.surface}; border-radius: 6px;
+          padding: 14px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center;
+        }
+        .admin-avatar-preview {
+          width: clamp(72px, 8vw, 104px); aspect-ratio: 1; border-radius: 999px; object-fit: cover;
+          border: 1px solid ${T.green}; background: ${T.bg};
+        }
+        .admin-avatar-body { display: grid; gap: 7px; min-width: 0; }
+        .admin-avatar-body strong { color: ${T.text}; font-size: .95rem; }
+        .admin-avatar-body p { color: ${T.sub}; line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
+        .admin-avatar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .admin-file-button { display: inline-flex; align-items: center; justify-content: center; }
+        .admin-file-button input { display: none; }
+        .admin-file-button[aria-disabled="true"] { pointer-events: none; }
         .admin-field { display: grid; gap: 6px; color: ${T.sub}; font-size: .78rem; font-family: ${FONT_MONO}; }
         .admin-field-block { grid-column: 1 / -1; }
         .admin-field input, .admin-field textarea, .admin-field select, .admin-stack select, .admin-inline-row input, .admin-editor textarea, .admin-wysiwyg, .admin-translation-field textarea {
@@ -1436,6 +1518,7 @@ export default function Admin() {
           .admin-actions button, .admin-actions a { flex: 1 1 160px; text-align: center; }
           .admin-undo-toast { flex-direction: column; align-items: flex-start; }
           .admin-card-head { flex-direction: column; }
+          .admin-avatar-card { grid-template-columns: 1fr; align-items: start; }
           .admin-import-form { grid-template-columns: 1fr; }
           .admin-candidate { grid-template-columns: 1fr; }
           .admin-inline-row { grid-template-columns: 1fr; }

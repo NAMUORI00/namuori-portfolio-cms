@@ -13,6 +13,7 @@ import type {
 export interface SaveFile {
   path: string;
   content: string;
+  encoding?: "text" | "base64";
 }
 
 export interface SavePayload {
@@ -56,6 +57,14 @@ function jsonFile(path: string, value: unknown): SaveFile {
 
 function orderFile(order?: ContentOrder): SaveFile[] {
   return order ? [jsonFile("content/order.json", order)] : [];
+}
+
+export function appendSaveFiles(payload: SavePayload, files: SaveFile[]): SavePayload {
+  if (files.length === 0) return payload;
+  return {
+    ...payload,
+    files: [...payload.files, ...files],
+  };
 }
 
 export function serializeProject(project: ProjectEntry): SaveFile {

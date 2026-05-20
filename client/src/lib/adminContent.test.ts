@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  appendSaveFiles,
   buildSavePayload,
   noteBranchName,
   projectBranchName,
@@ -107,5 +108,24 @@ describe("admin content helpers", () => {
       content: expect.stringContaining('"status": "구직 중"'),
     });
     expect(payload.files[0].content).toContain('"avatarUrl": "https://github.com/NAMUORI00.png"');
+  });
+
+  it("appends binary files without mutating the original save payload", () => {
+    const payload = buildSavePayload({ kind: "profile", value: profile });
+    const next = appendSaveFiles(payload, [
+      {
+        path: "client/public/uploads/avatar/namuori-avatar.webp",
+        content: "aGVsbG8=",
+        encoding: "base64",
+      },
+    ]);
+
+    expect(payload.files).toHaveLength(1);
+    expect(next.files).toHaveLength(2);
+    expect(next.files[1]).toEqual({
+      path: "client/public/uploads/avatar/namuori-avatar.webp",
+      content: "aGVsbG8=",
+      encoding: "base64",
+    });
   });
 });

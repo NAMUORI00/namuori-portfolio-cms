@@ -16,6 +16,19 @@ function bytesToBase64(value) {
   return btoa(binary);
 }
 
+export function encodeFileContentForGitHub({ content, encoding = "text" }) {
+  if (encoding === "base64") {
+    const normalized = String(content).replace(/\s+/g, "");
+    const base64Pattern = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+    if (!normalized || !base64Pattern.test(normalized)) {
+      throw new Error("Invalid base64 file content");
+    }
+    return normalized;
+  }
+  if (encoding === "text") return bytesToBase64(content);
+  throw new Error("Unsupported file encoding");
+}
+
 function derLength(length) {
   if (length < 128) return [length];
   const bytes = [];
@@ -166,7 +179,7 @@ export async function ensureBranch(env, branch, base = "main") {
   }
 }
 
-export async function upsertFile(env, { path, content, branch, message }) {
+export async function upsertFile(env, { path, content, encoding = "text", branch, message }) {
   const repo = repoPath(env);
   let sha;
   try {
@@ -179,7 +192,7 @@ export async function upsertFile(env, { path, content, branch, message }) {
     method: "PUT",
     body: JSON.stringify({
       message,
-      content: bytesToBase64(content),
+      content: encodeFileContentForGitHub({ content, encoding }),
       branch,
       sha,
     }),
