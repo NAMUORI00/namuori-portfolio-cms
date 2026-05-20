@@ -46,6 +46,7 @@ export const researchSchema = z.object({
   title: z.string().min(1),
   desc: z.string().min(1),
   status: statusSchema,
+  coverImage: z.string().optional(),
   showDiagram: z.boolean(),
   body: z.string(),
   relatedNotes: z.array(z.string()),
@@ -62,6 +63,7 @@ export const projectSchema = z.object({
   highlight: z.boolean(),
   private: z.boolean(),
   status: statusSchema,
+  coverImage: z.string().optional(),
   body: z.string(),
   relatedNotes: z.array(z.string()),
 });

@@ -861,6 +861,7 @@ export default function Home() {
               {RESEARCH_INTERESTS.map((r, idx) => (
                 <div key={r.title}>
                   <div
+                    className={r.coverImage ? "research-card has-cover" : "research-card"}
                     style={{
                       paddingLeft: "0.9rem",
                       borderLeft: `2px solid ${T.border}`,
@@ -869,23 +870,33 @@ export default function Home() {
                     onMouseEnter={(e) => (e.currentTarget.style.borderLeftColor = T.green)}
                     onMouseLeave={(e) => (e.currentTarget.style.borderLeftColor = T.border)}
                   >
-                    <div style={{
-                      fontFamily: FONT_SANS,
-                      fontSize: "0.88rem",
-                      fontWeight: 600,
-                      color: T.text,
-                      marginBottom: "4px",
-                    }}>
-                      {r.title}
-                    </div>
-                    <div style={{
-                      fontFamily: FONT_SANS,
-                      fontSize: "0.82rem",
-                      color: T.sub,
-                      lineHeight: 1.8,
-                      wordBreak: "keep-all",
-                    }}>
-                      {r.desc}
+                    {r.coverImage && (
+                      <img
+                        src={r.coverImage}
+                        alt={locale === "en" ? `${r.title} research cover` : `${r.title} 연구 대표 이미지`}
+                        className="content-cover-thumb research-cover-thumb"
+                        style={{ borderColor: T.border, background: T.surface }}
+                      />
+                    )}
+                    <div>
+                      <div style={{
+                        fontFamily: FONT_SANS,
+                        fontSize: "0.88rem",
+                        fontWeight: 600,
+                        color: T.text,
+                        marginBottom: "4px",
+                      }}>
+                        {r.title}
+                      </div>
+                      <div style={{
+                        fontFamily: FONT_SANS,
+                        fontSize: "0.82rem",
+                        color: T.sub,
+                        lineHeight: 1.8,
+                        wordBreak: "keep-all",
+                      }}>
+                        {r.desc}
+                      </div>
                     </div>
                   </div>
                   {/* RAG 다이어그램 이미지 */}
@@ -960,91 +971,103 @@ export default function Home() {
                       setFocusedGraphNodeId(null);
                     }}
                   >
-                  {/* 헤더 */}
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      {proj.private ? <LockIcon color={T.muted} /> : <RepoIcon color={T.muted} />}
-                      <span style={{
-                        fontFamily: FONT_MONO,
-                        fontSize: "0.82rem",
-                        fontWeight: 600,
-                        color: proj.highlight ? T.green : T.text,
-                      }}>
-                        {proj.name}
-                      </span>
-                      {proj.highlight && (
-                        <span style={{
-                          fontFamily: FONT_MONO,
-                          fontSize: "0.58rem",
-                          color: T.green,
-                          border: `1px solid ${T.green}50`,
-                          padding: "1px 5px",
-                          borderRadius: "2px",
-                        }}>
-                          {label("featured", "핵심")}
-                        </span>
+                    <div className={proj.coverImage ? "project-content has-cover" : "project-content"}>
+                      {proj.coverImage && (
+                        <img
+                          src={proj.coverImage}
+                          alt={locale === "en" ? `${proj.name} project cover` : `${proj.name} 프로젝트 대표 이미지`}
+                          className="content-cover-thumb project-cover-thumb"
+                          style={{ borderColor: T.border, background: T.bg }}
+                        />
                       )}
-                      {proj.private && (
-                        <span style={{
-                          fontFamily: FONT_MONO,
-                          fontSize: "0.58rem",
-                          color: T.muted,
-                          border: `1px solid ${T.border}`,
-                          padding: "1px 5px",
-                          borderRadius: "2px",
+                      <div className="project-copy">
+                        {/* 헤더 */}
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            {proj.private ? <LockIcon color={T.muted} /> : <RepoIcon color={T.muted} />}
+                            <span style={{
+                              fontFamily: FONT_MONO,
+                              fontSize: "0.82rem",
+                              fontWeight: 600,
+                              color: proj.highlight ? T.green : T.text,
+                            }}>
+                              {proj.name}
+                            </span>
+                            {proj.highlight && (
+                              <span style={{
+                                fontFamily: FONT_MONO,
+                                fontSize: "0.58rem",
+                                color: T.green,
+                                border: `1px solid ${T.green}50`,
+                                padding: "1px 5px",
+                                borderRadius: "2px",
+                              }}>
+                                {label("featured", "핵심")}
+                              </span>
+                            )}
+                            {proj.private && (
+                              <span style={{
+                                fontFamily: FONT_MONO,
+                                fontSize: "0.58rem",
+                                color: T.muted,
+                                border: `1px solid ${T.border}`,
+                                padding: "1px 5px",
+                                borderRadius: "2px",
+                              }}>
+                                {label("private", "비공개")}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                            <span style={{ fontFamily: FONT_MONO, fontSize: "0.62rem", color: T.muted }}>
+                              {proj.period}
+                            </span>
+                            <a
+                              href={previewHref(`/projects/${proj.slug}`)}
+                              style={{
+                                fontFamily: FONT_MONO,
+                                fontSize: "0.62rem",
+                                color: T.green,
+                                textDecoration: "none",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "2px",
+                              }}
+                            >
+                              {label("detail", "Detail")}
+                              <ExternalArrow color={T.green} />
+                            </a>
+                            {proj.link && <ExternalLink href={proj.link} T={T}>GitHub</ExternalLink>}
+                          </div>
+                        </div>
+                        {/* 설명 */}
+                        <p style={{
+                          fontFamily: FONT_SANS,
+                          fontSize: "0.82rem",
+                          color: T.sub,
+                          lineHeight: 1.8,
+                          margin: 0,
+                          wordBreak: "keep-all",
                         }}>
-                          {label("private", "비공개")}
-                        </span>
-                      )}
+                          {proj.desc}
+                        </p>
+                        {/* 정량 성과 */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <TrendIcon color={T.green} />
+                          <span style={{
+                            fontFamily: FONT_MONO,
+                            fontSize: "0.68rem",
+                            color: T.green,
+                          }}>
+                            {proj.metric}
+                          </span>
+                        </div>
+                        {/* 태그 */}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                          {proj.tags.map((tag) => <Tag key={tag} T={T}>{tag}</Tag>)}
+                        </div>
+                      </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                      <span style={{ fontFamily: FONT_MONO, fontSize: "0.62rem", color: T.muted }}>
-                        {proj.period}
-                      </span>
-                      <a
-                        href={previewHref(`/projects/${proj.slug}`)}
-                        style={{
-                          fontFamily: FONT_MONO,
-                          fontSize: "0.62rem",
-                          color: T.green,
-                          textDecoration: "none",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "2px",
-                        }}
-                      >
-                        {label("detail", "Detail")}
-                        <ExternalArrow color={T.green} />
-                      </a>
-                      {proj.link && <ExternalLink href={proj.link} T={T}>GitHub</ExternalLink>}
-                    </div>
-                  </div>
-                  {/* 설명 */}
-                  <p style={{
-                    fontFamily: FONT_SANS,
-                    fontSize: "0.82rem",
-                    color: T.sub,
-                    lineHeight: 1.8,
-                    margin: 0,
-                    wordBreak: "keep-all",
-                  }}>
-                    {proj.desc}
-                  </p>
-                  {/* 정량 성과 */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <TrendIcon color={T.green} />
-                    <span style={{
-                      fontFamily: FONT_MONO,
-                      fontSize: "0.68rem",
-                      color: T.green,
-                    }}>
-                      {proj.metric}
-                    </span>
-                  </div>
-                  {/* 태그 */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                    {proj.tags.map((tag) => <Tag key={tag} T={T}>{tag}</Tag>)}
-                  </div>
                   </div>
                 );
               })}
@@ -1226,6 +1249,43 @@ export default function Home() {
           background: ${T.green};
           border-color: ${T.bg};
         }
+        .research-card.has-cover {
+          display: grid;
+          grid-template-columns: minmax(120px, 28%) minmax(0, 1fr);
+          gap: 0.9rem;
+          align-items: start;
+        }
+        .project-content {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+        .project-content.has-cover {
+          display: grid;
+          grid-template-columns: minmax(130px, 26%) minmax(0, 1fr);
+          gap: 0.9rem;
+          align-items: start;
+        }
+        .project-copy {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+          min-width: 0;
+        }
+        .content-cover-thumb {
+          width: 100%;
+          aspect-ratio: 16 / 10;
+          border: 1px solid;
+          border-radius: 4px;
+          object-fit: cover;
+          display: block;
+        }
+        .research-cover-thumb {
+          min-height: 96px;
+        }
+        .project-cover-thumb {
+          min-height: 112px;
+        }
         @media (max-width: 1180px) {
           #knowledge-rail { display: none !important; }
           .scroll-inner { max-width: clamp(720px, 68vw, 1080px) !important; }
@@ -1234,6 +1294,9 @@ export default function Home() {
           #sidebar { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
           .scroll-inner { padding: 2rem 1.5rem 3rem !important; }
+          .research-card.has-cover,
+          .project-content.has-cover { grid-template-columns: 1fr; }
+          .content-cover-thumb { max-height: 220px; }
         }
         .mobile-overlay {
           display: none;

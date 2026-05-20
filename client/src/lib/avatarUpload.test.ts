@@ -3,6 +3,8 @@ import {
   AVATAR_MAX_BYTES,
   avatarUploadDraftFromDataUrl,
   avatarUploadPathForMime,
+  contentCoverUploadDraftFromDataUrl,
+  contentCoverUploadPathForMime,
   parseAvatarDataUrl,
   validateAvatarFile,
 } from "./avatarUpload";
@@ -52,6 +54,35 @@ describe("avatar upload helpers", () => {
         encoding: "base64",
       },
       publicUrl: "/uploads/avatar/namuori-avatar.png",
+    });
+  });
+
+  it("stores project and research cover images under slugged public paths", () => {
+    expect(contentCoverUploadPathForMime("projects", "Aerospace RAG", "image/webp")).toEqual({
+      repoPath: "client/public/uploads/projects/aerospace-rag.webp",
+      publicUrl: "/uploads/projects/aerospace-rag.webp",
+    });
+    expect(contentCoverUploadPathForMime("research", "RAG 실험", "image/png")).toEqual({
+      repoPath: "client/public/uploads/research/rag-실험.png",
+      publicUrl: "/uploads/research/rag-실험.png",
+    });
+  });
+
+  it("builds binary GitHub save files for content cover images", () => {
+    const draft = contentCoverUploadDraftFromDataUrl(
+      "research",
+      "edge-llm",
+      { name: "cover.jpg", type: "image/jpeg", size: 1200 },
+      "data:image/jpeg;base64,aGVsbG8=",
+    );
+
+    expect(draft).toEqual({
+      file: {
+        path: "client/public/uploads/research/edge-llm.jpg",
+        content: "aGVsbG8=",
+        encoding: "base64",
+      },
+      publicUrl: "/uploads/research/edge-llm.jpg",
     });
   });
 });

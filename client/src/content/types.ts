@@ -49,6 +49,7 @@ export interface ResearchEntry {
   title: string;
   desc: string;
   status: PublicationStatus;
+  coverImage?: string;
   showDiagram: boolean;
   body: string;
   relatedNotes: string[];
@@ -65,6 +66,7 @@ export interface ProjectEntry {
   highlight: boolean;
   private: boolean;
   status: PublicationStatus;
+  coverImage?: string;
   body: string;
   relatedNotes: string[];
 }

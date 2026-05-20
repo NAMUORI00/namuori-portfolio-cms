@@ -15,6 +15,8 @@ export interface AvatarUploadDraft {
   publicUrl: string;
 }
 
+export type ContentCoverKind = "projects" | "research";
+
 const MIME_EXTENSIONS: Record<AvatarMimeType, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -36,11 +38,28 @@ function avatarMimeType(file: AvatarFileDescriptor): AvatarMimeType | null {
   return EXTENSION_MIME_TYPES[extension] ?? null;
 }
 
+function slugBase(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣_-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "cover";
+}
+
 export function avatarUploadPathForMime(mimeType: AvatarMimeType): { repoPath: string; publicUrl: string } {
   const extension = MIME_EXTENSIONS[mimeType];
   return {
     repoPath: `client/public/uploads/avatar/namuori-avatar.${extension}`,
     publicUrl: `/uploads/avatar/namuori-avatar.${extension}`,
+  };
+}
+
+export function contentCoverUploadPathForMime(kind: ContentCoverKind, slug: string, mimeType: AvatarMimeType): { repoPath: string; publicUrl: string } {
+  const extension = MIME_EXTENSIONS[mimeType];
+  const cleanSlug = slugBase(slug);
+  return {
+    repoPath: `client/public/uploads/${kind}/${cleanSlug}.${extension}`,
+    publicUrl: `/uploads/${kind}/${cleanSlug}.${extension}`,
   };
 }
 
@@ -72,6 +91,20 @@ export function avatarUploadDraftFromDataUrl(file: AvatarFileDescriptor, dataUrl
   const validation = validateAvatarFile(file);
   if (!validation.ok) throw new Error(validation.error);
   const paths = avatarUploadPathForMime(validation.mimeType);
+  return {
+    file: {
+      path: paths.repoPath,
+      content: parseAvatarDataUrl(dataUrl, validation.mimeType),
+      encoding: "base64",
+    },
+    publicUrl: paths.publicUrl,
+  };
+}
+
+export function contentCoverUploadDraftFromDataUrl(kind: ContentCoverKind, slug: string, file: AvatarFileDescriptor, dataUrl: string): AvatarUploadDraft {
+  const validation = validateAvatarFile(file);
+  if (!validation.ok) throw new Error(validation.error);
+  const paths = contentCoverUploadPathForMime(kind, slug, validation.mimeType);
   return {
     file: {
       path: paths.repoPath,

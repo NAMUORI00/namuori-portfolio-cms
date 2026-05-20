@@ -22,6 +22,7 @@ const project: ProjectEntry = {
   highlight: true,
   private: false,
   status: "published",
+  coverImage: "/uploads/projects/aerospace-rag.webp",
   relatedNotes: ["rag-evaluation"],
   body: "## 개요\n\n본문",
 };
@@ -31,6 +32,7 @@ const research: ResearchEntry = {
   title: "Retrieval-Augmented Generation",
   desc: "Hybrid retrieval",
   status: "published",
+  coverImage: "/uploads/research/rag.webp",
   showDiagram: true,
   relatedNotes: ["rag-evaluation"],
   body: "## RAG\n\n본문",
@@ -76,8 +78,10 @@ describe("admin content helpers", () => {
   it("serializes project/research/note MDX", () => {
     expect(serializeProject(project).path).toBe("content/projects/aerospace-rag.mdx");
     expect(serializeProject(project).content).toContain("highlight: true");
+    expect(serializeProject(project).content).toContain("coverImage: /uploads/projects/aerospace-rag.webp");
     expect(serializeResearch(research).path).toBe("content/research/rag.mdx");
     expect(serializeResearch(research).content).toContain("showDiagram: true");
+    expect(serializeResearch(research).content).toContain("coverImage: /uploads/research/rag.webp");
     expect(serializeNote(note).path).toBe("content/notes/rag-evaluation.mdx");
     expect(serializeNote(note).content).toContain("relatedProjects:");
   });

@@ -6,7 +6,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { adminAccessState, type AdminSessionInfo } from "@/lib/adminAccess";
 import { appendSaveFiles, buildSavePayload, type SavePayload, type SaveTarget } from "@/lib/adminContent";
 import { buildAdminPreviewUrl, createAdminPreviewId, previewPathForSection, writeAdminPreviewDraft } from "@/lib/adminPreview";
-import { avatarUploadDraftFromDataUrl, type AvatarUploadDraft } from "@/lib/avatarUpload";
+import { avatarUploadDraftFromDataUrl, contentCoverUploadDraftFromDataUrl, type AvatarUploadDraft, type ContentCoverKind } from "@/lib/avatarUpload";
 import {
   applyTranslationValues,
   buildTranslationEntries,
@@ -64,6 +64,7 @@ type EditorMode = "write" | "source";
 type MoveDirection = "up" | "down";
 type UndoAction = { message: string; onUndo: () => void };
 type PendingAvatarUpload = AvatarUploadDraft & { fileName: string; previewUrl: string };
+type PendingContentCoverUpload = AvatarUploadDraft & { fileName: string; previewUrl: string };
 
 const SECTIONS: Array<{ key: SectionKey; label: string }> = [
   { key: "profile", label: "Profile" },
@@ -78,6 +79,10 @@ const SECTIONS: Array<{ key: SectionKey; label: string }> = [
 const STATUS_OPTIONS: PublicationStatus[] = ["draft", "published", "archived"];
 const INITIAL_GITHUB_IMPORT_SOURCE =
   portfolioContent.profile.contacts.find((contact) => contact.type === "github")?.href ?? `https://github.com/${portfolioContent.profile.handle}`;
+
+function coverUploadKey(kind: ContentCoverKind, slug: string): string {
+  return `${kind}:${slug}`;
+}
 
 function splitList(value: string): string[] {
   return value
@@ -293,6 +298,7 @@ export default function Admin() {
   const [appliedImport, setAppliedImport] = useState<ImportAppliedState>(() => createImportAppliedState());
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
   const [avatarUpload, setAvatarUpload] = useState<PendingAvatarUpload | null>(null);
+  const [coverUploads, setCoverUploads] = useState<Record<string, PendingContentCoverUpload>>({});
   const [previewId] = useState(() => createAdminPreviewId());
 
   const access = adminAccessState(session, localPreview);
@@ -327,8 +333,16 @@ export default function Admin() {
   const baseSavePayload = useMemo<SavePayload>(() => buildSavePayload(target), [target]);
   const savePayload = useMemo<SavePayload>(() => {
     if (active === "profile" && avatarUpload) return appendSaveFiles(baseSavePayload, [avatarUpload.file]);
+    if (active === "projects" && projects[projectIndex]) {
+      const upload = coverUploads[coverUploadKey("projects", projects[projectIndex].slug)];
+      if (upload) return appendSaveFiles(baseSavePayload, [upload.file]);
+    }
+    if (active === "research" && research[researchIndex]) {
+      const upload = coverUploads[coverUploadKey("research", research[researchIndex].slug)];
+      if (upload) return appendSaveFiles(baseSavePayload, [upload.file]);
+    }
     return baseSavePayload;
-  }, [active, avatarUpload, baseSavePayload]);
+  }, [active, avatarUpload, baseSavePayload, coverUploads, projectIndex, projects, research, researchIndex]);
   const translationSource = useMemo<TranslationSource | null>(() => {
     if (active === "profile") return { kind: "profile", value: profile };
     if (active === "projects" && projects[projectIndex]) return { kind: "project", value: projects[projectIndex] };
@@ -349,18 +363,32 @@ export default function Admin() {
     () => (avatarUpload ? { ...profile, avatarUrl: avatarUpload.previewUrl } : profile),
     [avatarUpload, profile],
   );
+  const previewProjects = useMemo<ProjectEntry[]>(
+    () => projects.map((item) => {
+      const upload = coverUploads[coverUploadKey("projects", item.slug)];
+      return upload ? { ...item, coverImage: upload.previewUrl } : item;
+    }),
+    [coverUploads, projects],
+  );
+  const previewResearch = useMemo<ResearchEntry[]>(
+    () => research.map((item) => {
+      const upload = coverUploads[coverUploadKey("research", item.slug)];
+      return upload ? { ...item, coverImage: upload.previewUrl } : item;
+    }),
+    [coverUploads, research],
+  );
   const previewContent = useMemo<PortfolioContent>(
     () => ({
       ...portfolioContent,
       profile: previewProfile,
       education,
-      research,
-      projects,
+      research: previewResearch,
+      projects: previewProjects,
       skills,
       starred,
       notes,
     }),
-    [education, notes, previewProfile, projects, research, skills, starred],
+    [education, notes, previewProfile, previewProjects, previewResearch, skills, starred],
   );
   const previewSlug = active === "projects" ? projects[projectIndex]?.slug : active === "research" ? research[researchIndex]?.slug : active === "notes" ? notes[noteIndex]?.slug : undefined;
   const adminPreviewUrl = useMemo(() => buildAdminPreviewUrl(previewPathForSection(active, { slug: previewSlug }), previewId, "ko"), [active, previewId, previewSlug]);
@@ -437,6 +465,52 @@ export default function Admin() {
     setAvatarUpload(null);
     updateProfile({ avatarUrl: "" });
     setStatus("GitHub 기본 프로필 이미지를 사용하도록 설정했습니다. 저장하면 profile.json에 반영됩니다.");
+  }
+
+  function clearCoverUpload(kind: ContentCoverKind, slug: string) {
+    setCoverUploads((current) => {
+      const next = { ...current };
+      delete next[coverUploadKey(kind, slug)];
+      return next;
+    });
+  }
+
+  function updateProjectCoverImage(slug: string, coverImage: string) {
+    clearCoverUpload("projects", slug);
+    updateProject({ coverImage: coverImage.trim() || undefined });
+  }
+
+  function updateResearchCoverImage(slug: string, coverImage: string) {
+    clearCoverUpload("research", slug);
+    updateResearch({ coverImage: coverImage.trim() || undefined });
+  }
+
+  async function handleCoverUploadChange(kind: ContentCoverKind, slug: string, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const draft = contentCoverUploadDraftFromDataUrl(kind, slug, file, dataUrl);
+      setCoverUploads((current) => ({ ...current, [coverUploadKey(kind, slug)]: { ...draft, fileName: file.name, previewUrl: dataUrl } }));
+      if (kind === "projects") updateProject({ coverImage: draft.publicUrl });
+      if (kind === "research") updateResearch({ coverImage: draft.publicUrl });
+      setStatus(`${file.name} 대표 이미지 준비 완료: 저장하면 ${draft.file.path}에 함께 커밋됩니다.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "대표 이미지를 불러오지 못했습니다.");
+    }
+  }
+
+  function removeProjectCoverImage(slug: string) {
+    clearCoverUpload("projects", slug);
+    updateProject({ coverImage: undefined });
+    setStatus("프로젝트 대표 이미지를 비웠습니다. 저장하면 텍스트형 카드로 표시됩니다.");
+  }
+
+  function removeResearchCoverImage(slug: string) {
+    clearCoverUpload("research", slug);
+    updateResearch({ coverImage: undefined });
+    setStatus("연구 관심사 대표 이미지를 비웠습니다. 저장하면 텍스트형 카드로 표시됩니다.");
   }
 
   function handlePreviewClick(event: MouseEvent<HTMLAnchorElement>) {
@@ -608,6 +682,8 @@ export default function Admin() {
       clearSavedSection(active);
       markSectionDraftReady(active);
       if (active === "profile") setAvatarUpload(null);
+      if (active === "projects" && projects[projectIndex]) clearCoverUpload("projects", projects[projectIndex].slug);
+      if (active === "research" && research[researchIndex]) clearCoverUpload("research", research[researchIndex].slug);
       setStatus(`로컬 미리보기: ${savePayload.branch}에 ${savePayload.files.length}개 파일을 저장할 준비가 됐습니다.`);
       return;
     }
@@ -617,6 +693,8 @@ export default function Admin() {
       clearSavedSection(active);
       markSectionDraftReady(active);
       if (active === "profile") setAvatarUpload(null);
+      if (active === "projects" && projects[projectIndex]) clearCoverUpload("projects", projects[projectIndex].slug);
+      if (active === "research" && research[researchIndex]) clearCoverUpload("research", research[researchIndex].slug);
       setStatus(`저장 완료: ${result.branch || savePayload.branch}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -1078,6 +1156,51 @@ export default function Admin() {
     );
   }
 
+  function renderCoverImageCard({
+    kind,
+    slug,
+    value,
+    title,
+    onUrlChange,
+    onRemove,
+  }: {
+    kind: ContentCoverKind;
+    slug: string;
+    value?: string;
+    title: string;
+    onUrlChange: (value: string) => void;
+    onRemove: () => void;
+  }) {
+    const upload = coverUploads[coverUploadKey(kind, slug)];
+    const imageSrc = upload?.previewUrl ?? value?.trim();
+    return (
+      <div className="admin-cover-card">
+        {imageSrc ? (
+          <img className="admin-cover-preview" src={imageSrc} alt={`${title} cover preview`} />
+        ) : (
+          <div className="admin-cover-empty">No image</div>
+        )}
+        <div className="admin-cover-body">
+          <span className="admin-kicker">cover image</span>
+          <strong>{upload ? upload.fileName : value?.trim() ? "Custom cover image" : "Text-only card"}</strong>
+          <p>
+            {upload
+              ? `${upload.publicUrl}로 저장 준비됨 · Save draft를 누르면 이미지 파일도 함께 커밋됩니다.`
+              : "대표 이미지가 있으면 메인 페이지에서 썸네일을 보여주고, 비워두면 기존 텍스트 레이아웃을 유지합니다."}
+          </p>
+          <Field disabled={!canEdit} label="Cover image URL" value={value ?? ""} onChange={onUrlChange} />
+          <div className="admin-cover-actions">
+            <label className="admin-file-button" aria-disabled={!canEdit}>
+              Upload image
+              <input disabled={!canEdit} accept="image/png,image/jpeg,image/webp" type="file" onChange={(event) => handleCoverUploadChange(kind, slug, event)} />
+            </label>
+            <ControlButton disabled={!canEdit || (!value && !upload)} onClick={onRemove}>Remove cover</ControlButton>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderEditor() {
     if (active === "profile") {
       return (
@@ -1176,6 +1299,14 @@ export default function Admin() {
             <Field disabled={!canEdit} label="Link" value={project.link} onChange={(link) => updateProject({ link })} />
             <CheckField disabled={!canEdit} label="Highlight on home" checked={project.highlight} onChange={(highlight) => updateProject({ highlight })} />
             <CheckField disabled={!canEdit} label="Private project" checked={project.private} onChange={(privateProject) => updateProject({ private: privateProject })} />
+            {renderCoverImageCard({
+              kind: "projects",
+              slug: project.slug,
+              value: project.coverImage,
+              title: project.name,
+              onUrlChange: (coverImage) => updateProjectCoverImage(project.slug, coverImage),
+              onRemove: () => removeProjectCoverImage(project.slug),
+            })}
             <TextArea disabled={!canEdit} label="Description" value={project.desc} onChange={(desc) => updateProject({ desc })} rows={4} />
             <TextArea disabled={!canEdit} label="Metric" value={project.metric} onChange={(metric) => updateProject({ metric })} rows={2} />
             <Field disabled={!canEdit} label="Tags" value={project.tags.join(", ")} onChange={(value) => updateProject({ tags: splitList(value) })} />
@@ -1215,6 +1346,14 @@ export default function Admin() {
             <Field disabled={!canEdit} label="Slug" value={item.slug} onChange={(slug) => updateResearch({ slug })} />
             <SelectField disabled={!canEdit} label="Status" value={item.status} options={STATUS_OPTIONS} onChange={(status) => updateResearch({ status })} />
             <CheckField disabled={!canEdit} label="Show RAG diagram" checked={item.showDiagram} onChange={(showDiagram) => updateResearch({ showDiagram })} />
+            {renderCoverImageCard({
+              kind: "research",
+              slug: item.slug,
+              value: item.coverImage,
+              title: item.title,
+              onUrlChange: (coverImage) => updateResearchCoverImage(item.slug, coverImage),
+              onRemove: () => removeResearchCoverImage(item.slug),
+            })}
             <TextArea disabled={!canEdit} label="Description" value={item.desc} onChange={(desc) => updateResearch({ desc })} rows={4} />
             <Field disabled={!canEdit} label="Related notes" value={item.relatedNotes.join(", ")} onChange={(value) => updateResearch({ relatedNotes: splitList(value) })} />
           </div>
@@ -1421,6 +1560,7 @@ export default function Admin() {
         .admin-back { font-family: ${FONT_MONO}; font-size: .75rem; text-decoration: none; }
         .admin-sidebar nav { display: grid; gap: 4px; margin-top: 28px; }
         .admin-sidebar button, .admin-actions button, .admin-actions a, .admin-editor-bar button, .admin-editor-bar a, .admin-file-button,
+        .admin-cover-actions button,
         .admin-toolbar button, .admin-card-actions button, .admin-inline-list button, .admin-import button, .admin-candidate button, .admin-undo-toast button, .admin-translation button {
           border: 1px solid ${T.border}; background: ${T.surface}; color: ${T.sub};
           border-radius: 4px; padding: 8px 10px; font-family: ${FONT_MONO}; cursor: pointer; text-decoration: none;
@@ -1429,7 +1569,7 @@ export default function Admin() {
         .admin-sidebar button.active, .admin-editor-bar button.active { color: ${T.green}; border-color: ${T.green}; background: ${T.greenBg}; }
         .admin-sidebar button.dirty { border-color: ${T.green}; }
         .admin-dirty-dot { width: 7px; height: 7px; border-radius: 999px; background: ${T.green}; box-shadow: 0 0 0 3px ${T.greenBg}; flex: 0 0 auto; }
-        .admin-actions button:disabled, .admin-actions a[aria-disabled="true"], .admin-editor-bar button:disabled, .admin-editor-bar a[aria-disabled="true"], .admin-file-button[aria-disabled="true"], .admin-toolbar button:disabled, .admin-card-actions button:disabled, .admin-inline-list button:disabled, .admin-import button:disabled, .admin-candidate button:disabled, .admin-translation button:disabled { opacity: .45; cursor: not-allowed; }
+        .admin-actions button:disabled, .admin-actions a[aria-disabled="true"], .admin-editor-bar button:disabled, .admin-editor-bar a[aria-disabled="true"], .admin-file-button[aria-disabled="true"], .admin-cover-actions button:disabled, .admin-toolbar button:disabled, .admin-card-actions button:disabled, .admin-inline-list button:disabled, .admin-import button:disabled, .admin-candidate button:disabled, .admin-translation button:disabled { opacity: .45; cursor: not-allowed; }
         .admin-toolbar button.danger, .admin-card-actions button.danger, .admin-inline-list button.danger { color: ${T.red}; border-color: ${T.red}; background: ${T.redBg}; }
         .admin-main { border-left: 0; min-width: 0; padding: 28px; }
         .admin-header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 22px; }
@@ -1494,6 +1634,18 @@ export default function Admin() {
         .admin-file-button { display: inline-flex; align-items: center; justify-content: center; }
         .admin-file-button input { display: none; }
         .admin-file-button[aria-disabled="true"] { pointer-events: none; }
+        .admin-cover-card {
+          grid-column: 1 / -1; border: 1px solid ${T.border}; background: ${T.surface}; border-radius: 6px;
+          padding: 14px; display: grid; grid-template-columns: minmax(160px, 32%) minmax(0, 1fr); gap: 14px; align-items: stretch;
+        }
+        .admin-cover-preview, .admin-cover-empty {
+          width: 100%; min-height: 150px; aspect-ratio: 16 / 9; border: 1px solid ${T.border}; border-radius: 4px;
+          background: ${T.bg}; object-fit: cover; display: grid; place-items: center; color: ${T.muted}; font-family: ${FONT_MONO}; font-size: .72rem;
+        }
+        .admin-cover-body { display: grid; gap: 8px; min-width: 0; align-content: start; }
+        .admin-cover-body strong { color: ${T.text}; font-size: .95rem; }
+        .admin-cover-body p { color: ${T.sub}; line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
+        .admin-cover-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         .admin-field { display: grid; gap: 6px; color: ${T.sub}; font-size: .78rem; font-family: ${FONT_MONO}; }
         .admin-field-block { grid-column: 1 / -1; }
         .admin-field input, .admin-field textarea, .admin-field select, .admin-stack select, .admin-inline-row input, .admin-editor textarea, .admin-wysiwyg, .admin-translation-field textarea {
@@ -1519,6 +1671,7 @@ export default function Admin() {
           .admin-undo-toast { flex-direction: column; align-items: flex-start; }
           .admin-card-head { flex-direction: column; }
           .admin-avatar-card { grid-template-columns: 1fr; align-items: start; }
+          .admin-cover-card { grid-template-columns: 1fr; }
           .admin-import-form { grid-template-columns: 1fr; }
           .admin-candidate { grid-template-columns: 1fr; }
           .admin-inline-row { grid-template-columns: 1fr; }

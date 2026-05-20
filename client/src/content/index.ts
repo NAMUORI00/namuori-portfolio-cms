@@ -26,6 +26,11 @@ function status(value: unknown): "draft" | "published" | "archived" {
   return value === "draft" || value === "archived" ? value : "published";
 }
 
+function optionalString(value: unknown): string | undefined {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text || undefined;
+}
+
 function parseResearch(source: string): ResearchEntry {
   const { data, body } = parseFrontmatter(source);
   return {
@@ -33,6 +38,7 @@ function parseResearch(source: string): ResearchEntry {
     title: String(data.title ?? ""),
     status: status(data.status),
     desc: String(data.desc ?? ""),
+    coverImage: optionalString(data.coverImage),
     showDiagram: bool(data.showDiagram),
     relatedNotes: stringArray(data.relatedNotes),
     body,
@@ -53,6 +59,7 @@ function parseProject(source: string): ProjectEntry {
     highlight: bool(data.highlight),
     private: bool(data.private),
     relatedNotes: stringArray(data.relatedNotes),
+    coverImage: optionalString(data.coverImage),
     body,
   };
 }

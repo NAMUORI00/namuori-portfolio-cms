@@ -40,6 +40,7 @@ describe("validatePortfolioContent", () => {
           title: "Retrieval-Augmented Generation (RAG)",
           desc: "하이브리드 검색과 도메인 특화 문서 인덱싱",
           status: "published",
+          coverImage: "/uploads/research/rag.webp",
           showDiagram: true,
           body: "## RAG\n\n검색과 생성을 연결합니다.",
           relatedNotes: ["rag-evaluation"],
@@ -57,6 +58,7 @@ describe("validatePortfolioContent", () => {
           highlight: true,
           private: false,
           status: "published",
+          coverImage: "/uploads/projects/aerospace-rag.webp",
           body: "## aerospace-rag\n\n문서 검색 파이프라인입니다.",
           relatedNotes: ["rag-evaluation"],
         },
@@ -79,6 +81,8 @@ describe("validatePortfolioContent", () => {
     });
 
     expect(result.projects[0].slug).toBe("aerospace-rag");
+    expect(result.projects[0].coverImage).toBe("/uploads/projects/aerospace-rag.webp");
+    expect(result.research[0].coverImage).toBe("/uploads/research/rag.webp");
     expect(result.notes[0].relatedProjects).toEqual(["aerospace-rag"]);
     expect(result.profile.avatarUrl).toBeUndefined();
   });
