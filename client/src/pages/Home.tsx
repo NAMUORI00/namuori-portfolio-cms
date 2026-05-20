@@ -24,7 +24,7 @@ import { englishTranslations, getProfileAvatarUrl, portfolioContent } from "@/co
 import { DARK, FONT_MONO, FONT_SANS, FONT_SERIF, LIGHT, type PortfolioTheme } from "@/content/theme";
 import { KnowledgeGraphRail } from "@/components/KnowledgeGraphRail";
 import { readAdminPreviewDraftFromLocation, withAdminPreviewUrl } from "@/lib/adminPreview";
-import { buildCoverPreview, type CoverPreviewPayload } from "@/lib/coverPreview";
+import { buildCoverPreview, buildResearchDiagramPreview, type CoverPreviewPayload } from "@/lib/coverPreview";
 import { localizePortfolioContent, uiText } from "@/lib/i18nContent";
 import { buildKnowledgeGraph } from "@/lib/knowledgeGraph";
 import { activeSectionForAnchor, scrollEndPaddingForCenteredSection, scrollTopForElementCenter } from "@/lib/scroll";
@@ -342,6 +342,80 @@ function ExternalLink({ href, children, T }: { href: string; children: React.Rea
   );
 }
 
+function ThemeModeIcon({ theme }: { theme: "light" | "dark" }) {
+  if (theme === "dark") {
+    return (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    );
+  }
+
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+    </svg>
+  );
+}
+
+function PreferenceSegmentedControl({
+  T,
+  theme,
+  locale,
+  onTheme,
+  onLocale,
+  themeLabel,
+  localeLabel,
+  style,
+}: {
+  T: PortfolioTheme;
+  theme: "light" | "dark";
+  locale: "ko" | "en";
+  onTheme?: () => void;
+  onLocale: () => void;
+  themeLabel: string;
+  localeLabel: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div
+      className="preference-control"
+      style={{
+        borderColor: T.border,
+        background: T.bg,
+        ...style,
+      }}
+    >
+      <button
+        type="button"
+        className="preference-segment"
+        onClick={onTheme}
+        disabled={!onTheme}
+        aria-label="테마 전환"
+        title={themeLabel}
+        style={{ color: T.sub }}
+      >
+        <ThemeModeIcon theme={theme} />
+        <span>{theme === "dark" ? "Light" : "Dark"}</span>
+      </button>
+      <span className="preference-divider" style={{ background: T.border }} />
+      <button
+        type="button"
+        className="preference-segment"
+        onClick={onLocale}
+        aria-label={locale === "en" ? "Switch language to Korean" : "영어 페이지로 전환"}
+        title={localeLabel}
+        style={{ color: T.sub }}
+      >
+        <span className="preference-code">{locale === "en" ? "KO" : "EN"}</span>
+      </button>
+    </div>
+  );
+}
+
 /* ════════════════════════════
    메인 컴포넌트
 ════════════════════════════ */
@@ -496,23 +570,16 @@ export default function Home() {
             </button>
           ))}
         </nav>
-        <button
-          onClick={toggleLocale}
-          style={{
-            marginTop: "1rem",
-            background: "none",
-            border: `1px solid ${T.border}`,
-            borderRadius: "3px",
-            cursor: "pointer",
-            padding: "7px 9px",
-            color: T.muted,
-            fontFamily: FONT_MONO,
-            fontSize: "0.64rem",
-            width: "100%",
-          }}
-        >
-          {languageToggleLabel}
-        </button>
+        <PreferenceSegmentedControl
+          T={T}
+          theme={theme}
+          locale={locale}
+          onTheme={toggleTheme}
+          onLocale={toggleLocale}
+          themeLabel={themeToggleLabel}
+          localeLabel={languageToggleLabel}
+          style={{ marginTop: "1rem" }}
+        />
       </div>
 
       {/* ════════════════════════════
@@ -671,62 +738,16 @@ export default function Home() {
           ))}
         </div>
 
-        {/* 다크 모드 토글 */}
-        <button
-          onClick={toggleTheme}
-          style={{
-            marginTop: "clamp(0.7rem, 1.8vh, 1rem)",
-            background: "none",
-            border: `1px solid ${T.border}`,
-            borderRadius: "3px",
-            cursor: "pointer",
-            padding: "5px 9px",
-            display: "flex",
-            alignItems: "center",
-            gap: "7px",
-            color: T.muted,
-            fontFamily: FONT_MONO,
-            fontSize: "0.62rem",
-            transition: "border-color 0.15s, color 0.15s",
-            width: "100%",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.green; e.currentTarget.style.color = T.green; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.muted; }}
-          aria-label="테마 전환"
-        >
-          {theme === "dark"
-            ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-            : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-          }
-          {themeToggleLabel}
-        </button>
-        <button
-          onClick={toggleLocale}
-          style={{
-            marginTop: "0.45rem",
-            background: "none",
-            border: `1px solid ${T.border}`,
-            borderRadius: "3px",
-            cursor: "pointer",
-            padding: "5px 9px",
-            display: "flex",
-            alignItems: "center",
-            gap: "7px",
-            color: T.muted,
-            fontFamily: FONT_MONO,
-            fontSize: "0.62rem",
-            transition: "border-color 0.15s, color 0.15s",
-            width: "100%",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = T.green; e.currentTarget.style.color = T.green; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.muted; }}
-          aria-label={locale === "en" ? "Switch language to Korean" : "영어 페이지로 전환"}
-        >
-          <span style={{ fontFamily: FONT_MONO, fontSize: "0.68rem", color: "currentColor" }}>
-            {locale === "en" ? "KO" : "EN"}
-          </span>
-          {languageToggleLabel}
-        </button>
+        <PreferenceSegmentedControl
+          T={T}
+          theme={theme}
+          locale={locale}
+          onTheme={toggleTheme}
+          onLocale={toggleLocale}
+          themeLabel={themeToggleLabel}
+          localeLabel={languageToggleLabel}
+          style={{ marginTop: "clamp(0.7rem, 1.8vh, 1rem)" }}
+        />
       </aside>
 
       {/* ════════════════════════════
@@ -876,10 +897,18 @@ export default function Home() {
           <FadeSection>
             <SectionTitle id="research" icon="flask" T={T}>Research Interests</SectionTitle>
             <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-              {RESEARCH_INTERESTS.map((r, idx) => (
+              {RESEARCH_INTERESTS.map((r) => {
+                const ragCaption = label("ragCaption", "Dense + Sparse + Graph 3채널 하이브리드 검색 아키텍처");
+                const researchPreview = r.coverImage
+                  ? buildCoverPreview({ locale, kind: "research", title: r.title, src: r.coverImage })
+                  : r.showDiagram
+                    ? buildResearchDiagramPreview({ locale, title: r.title, src: IMG.ragDiagram, caption: ragCaption })
+                    : null;
+
+                return (
                 <div key={r.title}>
                   <div
-                    className={r.coverImage ? "research-card has-cover" : "research-card"}
+                    className={researchPreview ? "research-card has-cover" : "research-card"}
                     style={{
                       paddingLeft: "0.9rem",
                       borderLeft: `2px solid ${T.border}`,
@@ -908,61 +937,28 @@ export default function Home() {
                         {r.desc}
                       </div>
                     </div>
-                    {r.coverImage && (() => {
-                      const preview = buildCoverPreview({ locale, kind: "research", title: r.title, src: r.coverImage });
-                      return (
-                        <button
-                          type="button"
-                          className="content-cover-button research-cover-button"
-                          aria-label={preview.actionLabel}
-                          onClick={() => setCoverPreview(preview)}
-                        >
-                          <img
-                            src={preview.src}
-                            alt={preview.alt}
-                            className="content-cover-thumb research-cover-thumb"
-                            style={{ borderColor: T.border, background: T.surface }}
-                          />
-                        </button>
-                      );
-                    })()}
+                    {researchPreview && (
+                      <button
+                        type="button"
+                        className="content-cover-button research-cover-button"
+                        aria-label={researchPreview.actionLabel}
+                        onClick={() => setCoverPreview(researchPreview)}
+                      >
+                        <img
+                          src={researchPreview.src}
+                          alt={researchPreview.alt}
+                          className="content-cover-thumb research-cover-thumb"
+                          style={{
+                            borderColor: T.border,
+                            background: T.surface,
+                          }}
+                        />
+                      </button>
+                    )}
                   </div>
-                  {/* RAG 다이어그램 이미지 */}
-                  {r.showDiagram && (
-                    <div style={{
-                      marginTop: "0.85rem",
-                      marginLeft: "0.9rem",
-                      border: `1px solid ${T.border}`,
-                      borderRadius: "4px",
-                      overflow: "hidden",
-                      background: T.surface,
-                    }}>
-                      <img
-                        src={IMG.ragDiagram}
-                        alt={locale === "en" ? "RAG system architecture diagram" : "RAG 시스템 아키텍처 다이어그램"}
-                        style={{
-                          width: "100%",
-                          height: "clamp(140px, 24vw, 180px)",
-                          objectFit: "cover",
-                          objectPosition: "center",
-                          display: "block",
-                          opacity: theme === "dark" ? 0.75 : 1,
-                          filter: theme === "dark" ? "invert(0.9) hue-rotate(120deg)" : "none",
-                        }}
-                      />
-                      <div style={{
-                        padding: "6px 10px",
-                        fontFamily: FONT_MONO,
-                        fontSize: "0.6rem",
-                        color: T.muted,
-                        borderTop: `1px solid ${T.border}`,
-                      }}>
-                        {label("ragCaption", "Dense + Sparse + Graph 3채널 하이브리드 검색 아키텍처")}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </FadeSection>
 
@@ -1309,6 +1305,57 @@ export default function Home() {
         .mobile-drawer::-webkit-scrollbar-thumb {
           background: ${T.green};
           border-color: ${T.bg};
+        }
+        .preference-control {
+          display: flex;
+          width: 100%;
+          min-height: 32px;
+          border: 1px solid;
+          border-radius: 4px;
+          overflow: hidden;
+          box-sizing: border-box;
+          transition: background 0.18s ease, border-color 0.18s ease;
+        }
+        .preference-segment {
+          appearance: none;
+          border: 0;
+          background: transparent;
+          min-width: 0;
+          flex: 1 1 0;
+          padding: 0 8px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          cursor: pointer;
+          font-family: ${FONT_MONO};
+          font-size: 0.62rem;
+          line-height: 1;
+          white-space: nowrap;
+          transition: background 0.15s ease, color 0.15s ease;
+        }
+        .preference-segment:hover,
+        .preference-segment:focus-visible {
+          background: ${T.greenBg};
+          color: ${T.green} !important;
+          outline: none;
+        }
+        .preference-segment:focus-visible {
+          box-shadow: inset 0 0 0 1px ${T.green};
+        }
+        .preference-segment:disabled {
+          cursor: default;
+          opacity: 0.55;
+        }
+        .preference-divider {
+          width: 1px;
+          flex: 0 0 1px;
+          align-self: stretch;
+        }
+        .preference-code {
+          font-size: 0.68rem;
+          font-weight: 700;
+          letter-spacing: 0;
         }
         .research-card.has-cover {
           display: grid;
