@@ -32,6 +32,14 @@ export function saveScopeSummary(section: AdminUxSectionKey, branch: string): st
   return `Current target: ${sectionLabel(section)} · ${branch}`;
 }
 
+export function canSaveDraft(canEdit: boolean, dirty: boolean): boolean {
+  return canEdit && dirty;
+}
+
+export function canPublishDraft(canEdit: boolean, dirty: boolean, draftReady: boolean): boolean {
+  return canEdit && draftReady && !dirty;
+}
+
 export function editableListKey(scope: string, index: number, nestedIndex?: number): string {
   return nestedIndex === undefined ? `${scope}:${index}` : `${scope}:${index}:${nestedIndex}`;
 }

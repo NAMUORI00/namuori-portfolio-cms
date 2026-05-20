@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   clearDirtySection,
   clearImportApplied,
+  canPublishDraft,
+  canSaveDraft,
   createImportAppliedState,
   editableListKey,
   hasDirtySection,
@@ -27,6 +29,17 @@ describe("admin UX helpers", () => {
     expect(sectionActionLabel("projects", "save")).toBe("Save Projects draft");
     expect(sectionActionLabel("projects", "publish")).toBe("Publish Projects PR");
     expect(saveScopeSummary("projects", "draft/project-aerospace-rag")).toBe("Current target: Projects · draft/project-aerospace-rag");
+  });
+
+  it("only enables save for dirty sections and publish for clean saved drafts", () => {
+    expect(canSaveDraft(true, true)).toBe(true);
+    expect(canSaveDraft(true, false)).toBe(false);
+    expect(canSaveDraft(false, true)).toBe(false);
+
+    expect(canPublishDraft(true, false, true)).toBe(true);
+    expect(canPublishDraft(true, true, true)).toBe(false);
+    expect(canPublishDraft(true, false, false)).toBe(false);
+    expect(canPublishDraft(false, false, true)).toBe(false);
   });
 
   it("tracks imported candidates that were applied but not saved yet", () => {

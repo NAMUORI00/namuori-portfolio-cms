@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent, type ReactNode } from "react";
 import { Link } from "wouter";
 import { englishTranslations, portfolioContent, type ContentOrder, type EducationEntry, type NoteEntry, type PortfolioContent, type ProfileContent, type ProjectEntry, type PublicationStatus, type ResearchEntry, type SkillGroup, type StarredRepo } from "@/content";
 import { DARK, FONT_MONO, FONT_SANS, LIGHT } from "@/content/theme";
@@ -18,6 +18,8 @@ import type { EnglishTranslations } from "@/lib/i18nContent";
 import {
   clearDirtySection,
   clearImportApplied,
+  canPublishDraft,
+  canSaveDraft,
   createImportAppliedState,
   editableListKey,
   hasDirtySection,
@@ -207,6 +209,18 @@ function MarkdownEditor({
   previewUrl: string;
   disabled?: boolean;
 }) {
+  const editableRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const editor = editableRef.current;
+    if (!editor || mode !== "write" || document.activeElement === editor) return;
+    if (editor.innerText !== body) editor.innerText = body;
+  }, [body, mode]);
+
+  function handleWritableInput(event: FormEvent<HTMLDivElement>) {
+    onChange(event.currentTarget.innerText);
+  }
+
   return (
     <div className="admin-editor">
       <div className="admin-editor-bar">
@@ -224,13 +238,13 @@ function MarkdownEditor({
       </div>
       {mode === "write" && (
         <div
+          ref={editableRef}
           className="admin-wysiwyg"
           contentEditable={!disabled}
           suppressContentEditableWarning
-          onBlur={(event) => onChange(event.currentTarget.innerText)}
-        >
-          {body}
-        </div>
+          onInput={handleWritableInput}
+          onBlur={handleWritableInput}
+        />
       )}
       {mode === "source" && <textarea disabled={disabled} rows={12} value={body} onChange={(event) => onChange(event.target.value)} />}
     </div>
@@ -262,6 +276,9 @@ export default function Admin() {
   const [importLoading, setImportLoading] = useState(false);
   const [translationLoading, setTranslationLoading] = useState(false);
   const [dirtySections, setDirtySections] = useState<SectionKey[]>([]);
+  const [readyDraftSections, setReadyDraftSections] = useState<SectionKey[]>([]);
+  const [translationDirty, setTranslationDirty] = useState(false);
+  const [translationDraftReady, setTranslationDraftReady] = useState(false);
   const [appliedImport, setAppliedImport] = useState<ImportAppliedState>(() => createImportAppliedState());
   const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
   const [previewId] = useState(() => createAdminPreviewId());
@@ -309,6 +326,7 @@ export default function Admin() {
   );
   const activeTranslationStats = translationSource ? translationStats(enTranslations, translationSource) : null;
   const activeDirty = hasDirtySection(dirtySections, active);
+  const activeDraftReady = hasDirtySection(readyDraftSections, active);
   const dirtySectionLabels = dirtySections.map(sectionLabel).join(", ");
   const currentScope = saveScopeSummary(active, savePayload.branch);
   const previewContent = useMemo<PortfolioContent>(
@@ -340,6 +358,7 @@ export default function Admin() {
 
   function markSectionDirty(section: SectionKey) {
     setDirtySections((items) => markDirtySection(items, section));
+    setReadyDraftSections((items) => clearDirtySection(items, section));
   }
 
   function clearSavedSection(section: SectionKey) {
@@ -347,6 +366,15 @@ export default function Admin() {
     if (section === "projects" || section === "skills" || section === "starred") {
       setAppliedImport((state) => clearImportApplied(state, section));
     }
+  }
+
+  function markSectionDraftReady(section: SectionKey) {
+    setReadyDraftSections((items) => markDirtySection(items, section));
+  }
+
+  function markTranslationsDirty() {
+    setTranslationDirty(true);
+    setTranslationDraftReady(false);
   }
 
   function queueUndo(message: string, onUndo: () => void) {
@@ -386,6 +414,7 @@ export default function Admin() {
 
   function updateEnglishTranslation(entry: TranslationEntry, value: string) {
     setEnTranslations((current) => applyTranslationValues(current, [entry], { [entry.key]: value }));
+    markTranslationsDirty();
   }
 
   async function generateEnglishDraft() {
@@ -395,6 +424,7 @@ export default function Admin() {
       if (localPreview && !session?.authenticated) {
         const fallback = Object.fromEntries(translationEntries.map((entryItem) => [entryItem.key, getTranslationValue(enTranslations, entryItem.key) || entryItem.text]));
         setEnTranslations((current) => applyTranslationValues(current, translationEntries, fallback));
+        markTranslationsDirty();
         setStatus("로컬 미리보기: 영어 번역 초안 흐름을 적용했습니다. 실제 번역은 배포 환경의 Workers AI에서 실행됩니다.");
         return;
       }
@@ -404,6 +434,7 @@ export default function Admin() {
         ((result.entries ?? []) as Array<{ key: string; text: string }>).map((item) => [item.key, item.text]),
       );
       setEnTranslations((current) => applyTranslationValues(current, translationEntries, values));
+      markTranslationsDirty();
       setStatus(`영어 번역 초안을 생성했습니다: ${translationEntries.length}개 항목`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "영어 번역 초안 생성에 실패했습니다.");
@@ -413,7 +444,7 @@ export default function Admin() {
   }
 
   async function saveEnglishTranslations() {
-    if (!canEdit) return;
+    if (!canSaveDraft(canEdit, translationDirty)) return;
     const payload: SavePayload = {
       branch: "draft/i18n-en",
       message: "Update English translations",
@@ -425,12 +456,16 @@ export default function Admin() {
       ],
     };
     if (localPreview && !session?.authenticated) {
+      setTranslationDirty(false);
+      setTranslationDraftReady(true);
       setStatus("로컬 미리보기: content/i18n/en.json 저장 흐름을 확인했습니다.");
       return;
     }
     try {
       setStatus("영어 번역 파일을 GitHub draft 브랜치에 저장 중...");
       const result = await postJson("/api/github/save", payload);
+      setTranslationDirty(false);
+      setTranslationDraftReady(true);
       setStatus(`영어 번역 저장 완료: ${result.branch || payload.branch}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "영어 번역 저장에 실패했습니다.");
@@ -438,7 +473,7 @@ export default function Admin() {
   }
 
   async function publishEnglishTranslations() {
-    if (!canEdit) return;
+    if (!canPublishDraft(canEdit, translationDirty, translationDraftReady)) return;
     const payload = {
       branch: "draft/i18n-en",
       title: "Update English translations",
@@ -522,8 +557,10 @@ export default function Admin() {
   }
 
   async function saveDraft() {
-    if (!canEdit) return;
+    if (!canSaveDraft(canEdit, activeDirty)) return;
     if (localPreview && !session?.authenticated) {
+      clearSavedSection(active);
+      markSectionDraftReady(active);
       setStatus(`로컬 미리보기: ${savePayload.branch}에 ${savePayload.files.length}개 파일을 저장할 준비가 됐습니다.`);
       return;
     }
@@ -531,6 +568,7 @@ export default function Admin() {
       setStatus("GitHub draft 브랜치에 저장 중...");
       const result = await postJson("/api/github/save", savePayload);
       clearSavedSection(active);
+      markSectionDraftReady(active);
       setStatus(`저장 완료: ${result.branch || savePayload.branch}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -538,7 +576,7 @@ export default function Admin() {
   }
 
   async function publishDraft() {
-    if (!canEdit) return;
+    if (!canPublishDraft(canEdit, activeDirty, activeDraftReady)) return;
     const payload = {
       branch: savePayload.branch,
       title: savePayload.message,
@@ -965,10 +1003,10 @@ export default function Admin() {
             <button type="button" disabled={!canEdit || translationLoading} onClick={generateEnglishDraft}>
               {translationLoading ? "Generating..." : "Generate EN draft"}
             </button>
-            <button type="button" disabled={!canEdit} onClick={saveEnglishTranslations}>
+            <button type="button" disabled={!canSaveDraft(canEdit, translationDirty)} onClick={saveEnglishTranslations}>
               Save EN file
             </button>
-            <button type="button" disabled={!canEdit} onClick={publishEnglishTranslations}>
+            <button type="button" disabled={!canPublishDraft(canEdit, translationDirty, translationDraftReady)} onClick={publishEnglishTranslations}>
               Publish EN PR
             </button>
           </div>
@@ -1292,8 +1330,8 @@ export default function Admin() {
               {!session?.authenticated && import.meta.env.DEV && !localPreview && <a href="/admin?demo=1">Local Preview</a>}
               {session?.authenticated && <a href="/api/auth/logout">Logout</a>}
               <a href={adminPreviewUrl} target="_blank" rel="noopener noreferrer" aria-disabled={!canEdit} onClick={handlePreviewClick}>Preview</a>
-              <button type="button" disabled={!canEdit} onClick={saveDraft}>{sectionActionLabel(active, "save")}</button>
-              <button type="button" disabled={!canEdit} onClick={publishDraft}>{sectionActionLabel(active, "publish")}</button>
+              <button type="button" disabled={!canSaveDraft(canEdit, activeDirty)} onClick={saveDraft}>{sectionActionLabel(active, "save")}</button>
+              <button type="button" disabled={!canPublishDraft(canEdit, activeDirty, activeDraftReady)} onClick={publishDraft}>{sectionActionLabel(active, "publish")}</button>
             </div>
           </header>
           {undoAction && (
