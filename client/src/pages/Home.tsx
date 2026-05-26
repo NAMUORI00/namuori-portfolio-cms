@@ -23,6 +23,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { englishTranslations, getProfileAvatarUrl, portfolioContent } from "@/content";
 import { DARK, FONT_MONO, FONT_SANS, FONT_SERIF, LIGHT, type PortfolioTheme } from "@/content/theme";
 import { KnowledgeGraphRail } from "@/components/KnowledgeGraphRail";
+import { MobileKnowledgeGraph } from "@/components/MobileKnowledgeGraph";
 import { readAdminPreviewDraftFromLocation, withAdminPreviewUrl } from "@/lib/adminPreview";
 import { buildCoverPreview, buildResearchDiagramPreview, type CoverPreviewPayload } from "@/lib/coverPreview";
 import { localizePortfolioContent, uiText } from "@/lib/i18nContent";
@@ -570,6 +571,49 @@ export default function Home() {
             </button>
           ))}
         </nav>
+        <div
+          style={{
+            marginTop: "1.15rem",
+            paddingTop: "0.95rem",
+            borderTop: `1px solid ${T.border}`,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT_MONO,
+              fontSize: "0.58rem",
+              color: T.muted,
+              letterSpacing: "0.08em",
+              marginBottom: "0.65rem",
+            }}
+          >
+            {label("contact", "CONTACT")}
+          </div>
+          <div style={{ display: "grid", gap: "0.35rem" }}>
+            {PROFILE.contacts.map((c) => (
+              <a
+                key={`mobile-${c.href}`}
+                href={c.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "7px",
+                  minHeight: "30px",
+                  fontFamily: FONT_MONO,
+                  fontSize: "0.64rem",
+                  color: T.sub,
+                  textDecoration: "none",
+                  wordBreak: "break-all",
+                }}
+              >
+                <ContactIcon type={c.type} color={T.muted} />
+                <span>{c.label}</span>
+              </a>
+            ))}
+          </div>
+        </div>
         <PreferenceSegmentedControl
           T={T}
           theme={theme}
@@ -961,6 +1005,8 @@ export default function Home() {
               })}
             </div>
           </FadeSection>
+
+          <MobileKnowledgeGraph graph={KNOWLEDGE_GRAPH} T={T} active={active} />
 
           {/* ── 프로젝트 ── */}
           <FadeSection>
@@ -1485,14 +1531,19 @@ export default function Home() {
           border-color: ${T.green};
           color: ${T.green};
         }
+        .mobile-knowledge-section { display: none; }
         @media (max-width: 1180px) {
           #knowledge-rail { display: none !important; }
           .scroll-inner { max-width: clamp(720px, 68vw, 1080px) !important; }
+          .mobile-knowledge-section { display: block; }
         }
         @media (max-width: 768px) {
           #sidebar { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
           .scroll-inner { padding: 2rem 1.5rem 3rem !important; }
+          .mobile-knowledge-section {
+            margin-bottom: 2.1rem !important;
+          }
           .research-card.has-cover,
           .project-content.has-cover { grid-template-columns: 1fr; }
           .content-cover-button {
