@@ -30,6 +30,7 @@ import { applyDocumentMetadata } from "@/lib/documentMetadata";
 import { localizePortfolioContent, uiText } from "@/lib/i18nContent";
 import { buildKnowledgeGraph } from "@/lib/knowledgeGraph";
 import { activeSectionForAnchor, scrollEndPaddingForCenteredSection, scrollTopForElementCenter } from "@/lib/scroll";
+import { toMarkdownHtml } from "@/content/markdown";
 
 const ACTIVE_SECTION_ANCHOR_RATIO = 0.5;
 const ACTIVE_SCROLL_END_TOLERANCE = 4;
@@ -594,6 +595,7 @@ export default function Home() {
   const TIMELINE_ENTRIES = content.education.filter((item) => item.status === "published");
   const RESEARCH_INTERESTS = content.research.filter((item) => item.status === "published");
   const PROJECTS = content.projects.filter((item) => item.status === "published");
+  const NOTES = content.notes.filter((item) => item.status === "published");
   const SKILL_GROUPS = content.skills;
   const STARRED = content.starred;
   const PROFILE = content.profile;
@@ -611,10 +613,23 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [focusedGraphNodeId, setFocusedGraphNodeId] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<CoverPreviewPayload | null>(null);
+  const [selectedProjectSlug, setSelectedProjectSlug] = useState<string | null>(() => PROJECTS[0]?.slug ?? null);
   const previewHref = useCallback((path: string) => withAdminPreviewUrl(path, previewId), [previewId]);
   const label = (key: string, fallback: string) => (locale === "en" ? uiText(sourceTranslations, key, fallback) : fallback);
   const themeToggleLabel = theme === "dark" ? label("lightMode", "라이트 모드") : label("darkMode", "다크 모드");
   const languageToggleLabel = locale === "en" ? label("languageToKorean", "한국어") : label("languageToEnglish", "English");
+  const selectedProject = PROJECTS.find((project) => project.slug === selectedProjectSlug) ?? PROJECTS[0] ?? null;
+  const activeProjectGraphNodeId = focusedGraphNodeId ?? (selectedProject ? `project:${selectedProject.slug}` : null);
+
+  useEffect(() => {
+    if (PROJECTS.length === 0) {
+      if (selectedProjectSlug !== null) setSelectedProjectSlug(null);
+      return;
+    }
+    if (!PROJECTS.some((project) => project.slug === selectedProjectSlug)) {
+      setSelectedProjectSlug(PROJECTS[0].slug);
+    }
+  }, [PROJECTS, selectedProjectSlug]);
 
   useEffect(() => {
     if (!coverPreview) return;
@@ -1193,6 +1208,7 @@ export default function Home() {
             }}>
               {PROJECTS.map((proj, idx) => {
                 const graphNodeId = `project:${proj.slug}`;
+                const projectDetailPanelId = `project-detail-panel-${proj.slug}`;
                 return (
                   <div
                     key={proj.name}
@@ -1204,7 +1220,7 @@ export default function Home() {
                       flexDirection: "column",
                       gap: "0.4rem",
                       borderBottom: idx < PROJECTS.length - 1 ? `1px solid ${T.border}` : "none",
-                      background: focusedGraphNodeId === graphNodeId ? T.bg : T.surface,
+                      background: activeProjectGraphNodeId === graphNodeId ? T.bg : T.surface,
                       transition: "background 0.15s",
                     }}
                     onMouseEnter={() => {
@@ -1257,21 +1273,22 @@ export default function Home() {
                             <span style={{ fontFamily: FONT_MONO, fontSize: "0.62rem", color: T.muted }}>
                               {proj.period}
                             </span>
-                            <a
-                              href={previewHref(`/projects/${proj.slug}`)}
-                              style={{
-                                fontFamily: FONT_MONO,
-                                fontSize: "0.62rem",
-                                color: T.green,
-                                textDecoration: "none",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "2px",
+                            <button
+                              type="button"
+                              className="project-detail-button"
+                              aria-controls={projectDetailPanelId}
+                              aria-expanded={selectedProjectSlug === proj.slug}
+                              aria-pressed={selectedProjectSlug === proj.slug}
+                              onClick={() => {
+                                setSelectedProjectSlug(proj.slug);
+                                setFocusedGraphNodeId(graphNodeId);
                               }}
+                              style={{ borderColor: selectedProjectSlug === proj.slug ? T.green : T.border }}
                             >
-                              {label("detail", "Detail")}
-                              <ExternalArrow color={T.green} />
-                            </a>
+                              {selectedProjectSlug === proj.slug
+                                ? (locale === "en" ? "Showing" : "표시 중")
+                                : (locale === "en" ? "Details" : "자세히 보기")}
+                            </button>
                             {proj.link && <ExternalLink href={proj.link} T={T}>GitHub</ExternalLink>}
                           </div>
                         </div>
@@ -1321,6 +1338,38 @@ export default function Home() {
                         );
                       })()}
                     </div>
+                    {selectedProject?.slug === proj.slug && (
+                      <div id={projectDetailPanelId} className="project-detail-panel">
+                        <div className="project-detail-head">
+                          <div>
+                            <span className="project-detail-kicker">{locale === "en" ? "Selected project" : "선택한 프로젝트"}</span>
+                            <strong>{selectedProject.name}</strong>
+                          </div>
+                          <span className="project-detail-period">{selectedProject.period}</span>
+                        </div>
+                        <div className="project-detail-meta">
+                          {selectedProject.metric && (
+                            <span className="project-detail-metric">
+                              <TrendIcon color={T.green} />
+                              {selectedProject.metric}
+                            </span>
+                          )}
+                          {selectedProject.relatedNotes.length > 0 && (
+                            <span>
+                              {locale === "en" ? "Related notes" : "관련 노트"} ·{" "}
+                              {selectedProject.relatedNotes
+                                .map((slug) => NOTES.find((note) => note.slug === slug)?.title ?? slug)
+                                .join(", ")}
+                            </span>
+                          )}
+                        </div>
+                        <article
+                          className="project-detail-body markdown-body"
+                          style={{ color: T.sub }}
+                          dangerouslySetInnerHTML={{ __html: toMarkdownHtml(selectedProject.body) }}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1469,7 +1518,7 @@ export default function Home() {
         </div>
       </div>
 
-      <KnowledgeGraphRail graph={KNOWLEDGE_GRAPH} T={T} active={active} focusNodeId={focusedGraphNodeId} />
+      <KnowledgeGraphRail graph={KNOWLEDGE_GRAPH} T={T} active={active} focusNodeId={activeProjectGraphNodeId} />
 
       {coverPreview && (
         <div
@@ -1789,6 +1838,85 @@ export default function Home() {
           gap: 0.4rem;
           min-width: 0;
         }
+        .project-detail-button {
+          appearance: none;
+          display: inline-flex;
+          align-items: center;
+          min-height: 24px;
+          border: 1px solid;
+          border-radius: 999px;
+          background: ${T.bg};
+          color: ${T.green};
+          padding: 2px 8px;
+          font-family: ${FONT_MONO};
+          font-size: 0.62rem;
+          line-height: 1.25;
+          cursor: pointer;
+        }
+        .project-detail-button:hover,
+        .project-detail-button:focus-visible,
+        .project-detail-button[aria-pressed="true"] {
+          border-color: ${T.green} !important;
+          background: ${T.greenBg};
+          outline: none;
+        }
+        .project-detail-panel {
+          margin-top: 0.8rem;
+          padding-top: 0.9rem;
+          border-top: 1px dashed ${T.border};
+          overflow: hidden;
+        }
+        .project-detail-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 0.85rem;
+          margin-bottom: 0.55rem;
+        }
+        .project-detail-head strong {
+          display: block;
+          margin-top: 0.22rem;
+          color: ${T.text};
+          font-family: ${FONT_SANS};
+          font-size: 0.95rem;
+          line-height: 1.45;
+          word-break: keep-all;
+        }
+        .project-detail-kicker,
+        .project-detail-period {
+          color: ${T.muted};
+          font-family: ${FONT_MONO};
+          font-size: 0.64rem;
+        }
+        .project-detail-period {
+          flex-shrink: 0;
+        }
+        .project-detail-meta {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.45rem 0.7rem;
+          margin-bottom: 0.75rem;
+          color: ${T.muted};
+          font-family: ${FONT_MONO};
+          font-size: 0.66rem;
+          line-height: 1.6;
+        }
+        .project-detail-metric {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          color: ${T.green};
+        }
+        .project-detail-body {
+          max-width: min(74ch, 100%);
+          overflow-x: auto;
+          font-size: 0.84rem;
+          line-height: 1.86;
+          word-break: keep-all;
+        }
+        .project-detail-body :last-child {
+          margin-bottom: 0;
+        }
         .content-cover-button {
           appearance: none;
           border: 0;
@@ -1923,6 +2051,13 @@ export default function Home() {
            }
            .timeline-load-more {
              margin-left: 16px;
+           }
+           .project-detail-head {
+             flex-direction: column;
+             gap: 0.35rem;
+           }
+           .project-detail-period {
+             flex-shrink: 1;
            }
            .content-cover-button {
              justify-self: start;

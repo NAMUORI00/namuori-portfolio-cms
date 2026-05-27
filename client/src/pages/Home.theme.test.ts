@@ -15,7 +15,7 @@ describe("Home project row theme behavior", () => {
   it("keeps project row background owned by React theme state", () => {
     const block = projectRowBlock();
 
-    expect(block).toContain("background: focusedGraphNodeId === graphNodeId ? T.bg : T.surface");
+    expect(block).toContain("background: activeProjectGraphNodeId === graphNodeId ? T.bg : T.surface");
     expect(block).not.toContain("currentTarget.style.background");
   });
 });
