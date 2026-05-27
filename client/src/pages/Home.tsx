@@ -613,12 +613,12 @@ export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [focusedGraphNodeId, setFocusedGraphNodeId] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<CoverPreviewPayload | null>(null);
-  const [selectedProjectSlug, setSelectedProjectSlug] = useState<string | null>(() => PROJECTS[0]?.slug ?? null);
+  const [selectedProjectSlug, setSelectedProjectSlug] = useState<string | null>(null);
   const previewHref = useCallback((path: string) => withAdminPreviewUrl(path, previewId), [previewId]);
   const label = (key: string, fallback: string) => (locale === "en" ? uiText(sourceTranslations, key, fallback) : fallback);
   const themeToggleLabel = theme === "dark" ? label("lightMode", "라이트 모드") : label("darkMode", "다크 모드");
   const languageToggleLabel = locale === "en" ? label("languageToKorean", "한국어") : label("languageToEnglish", "English");
-  const selectedProject = PROJECTS.find((project) => project.slug === selectedProjectSlug) ?? PROJECTS[0] ?? null;
+  const selectedProject = PROJECTS.find((project) => project.slug === selectedProjectSlug) ?? null;
   const activeProjectGraphNodeId = focusedGraphNodeId ?? (selectedProject ? `project:${selectedProject.slug}` : null);
 
   useEffect(() => {
@@ -626,8 +626,8 @@ export default function Home() {
       if (selectedProjectSlug !== null) setSelectedProjectSlug(null);
       return;
     }
-    if (!PROJECTS.some((project) => project.slug === selectedProjectSlug)) {
-      setSelectedProjectSlug(PROJECTS[0].slug);
+    if (selectedProjectSlug && !PROJECTS.some((project) => project.slug === selectedProjectSlug)) {
+      setSelectedProjectSlug(null);
     }
   }, [PROJECTS, selectedProjectSlug]);
 
@@ -1209,6 +1209,7 @@ export default function Home() {
               {PROJECTS.map((proj, idx) => {
                 const graphNodeId = `project:${proj.slug}`;
                 const projectDetailPanelId = `project-detail-panel-${proj.slug}`;
+                const isProjectExpanded = selectedProjectSlug === proj.slug;
                 return (
                   <div
                     key={proj.name}
@@ -1277,16 +1278,16 @@ export default function Home() {
                               type="button"
                               className="project-detail-button"
                               aria-controls={projectDetailPanelId}
-                              aria-expanded={selectedProjectSlug === proj.slug}
-                              aria-pressed={selectedProjectSlug === proj.slug}
+                              aria-expanded={isProjectExpanded}
+                              aria-pressed={isProjectExpanded}
                               onClick={() => {
-                                setSelectedProjectSlug(proj.slug);
+                                setSelectedProjectSlug(isProjectExpanded ? null : proj.slug);
                                 setFocusedGraphNodeId(graphNodeId);
                               }}
-                              style={{ borderColor: selectedProjectSlug === proj.slug ? T.green : T.border }}
+                              style={{ borderColor: isProjectExpanded ? T.green : T.border }}
                             >
-                              {selectedProjectSlug === proj.slug
-                                ? (locale === "en" ? "Showing" : "표시 중")
+                              {isProjectExpanded
+                                ? (locale === "en" ? "Summary" : "요약")
                                 : (locale === "en" ? "Details" : "자세히 보기")}
                             </button>
                             {proj.link && <ExternalLink href={proj.link} T={T}>GitHub</ExternalLink>}

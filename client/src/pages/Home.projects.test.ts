@@ -20,9 +20,11 @@ describe("Home projects section", () => {
     expect(block).toContain("selectedProjectSlug");
     expect(block).toContain("selectedProject");
     expect(block).toContain("setSelectedProjectSlug");
+    expect(source).toContain("useState<string | null>(null)");
+    expect(source).not.toContain("useState<string | null>(() => PROJECTS[0]?.slug ?? null)");
     expect(block).toContain('className="project-detail-button"');
     expect(block).toContain("aria-controls={projectDetailPanelId}");
-    expect(block).toContain("aria-expanded={selectedProjectSlug === proj.slug}");
+    expect(block).toContain("aria-expanded={isProjectExpanded}");
     expect(block).toContain('className="project-detail-panel"');
     expect(block).toContain('className="project-detail-body markdown-body"');
     expect(block).toContain("toMarkdownHtml(selectedProject.body)");
@@ -33,5 +35,20 @@ describe("Home projects section", () => {
 
     expect(block).toContain("{proj.link && <ExternalLink href={proj.link} T={T}>GitHub</ExternalLink>}");
     expect(block).not.toContain("previewHref(`/projects/");
+  });
+
+  it("starts collapsed and toggles the selected project back to summary mode", () => {
+    const block = projectsBlock();
+
+    expect(source).toContain("const selectedProject = PROJECTS.find((project) => project.slug === selectedProjectSlug) ?? null");
+    expect(source).not.toContain("const selectedProject = PROJECTS.find((project) => project.slug === selectedProjectSlug) ?? PROJECTS[0] ?? null");
+    expect(block).toContain("const isProjectExpanded = selectedProjectSlug === proj.slug");
+    expect(block).toContain("setSelectedProjectSlug(isProjectExpanded ? null : proj.slug)");
+    expect(block).toContain('aria-expanded={isProjectExpanded}');
+    expect(block).toContain('aria-pressed={isProjectExpanded}');
+    expect(block).toContain("isProjectExpanded ? T.green : T.border");
+    expect(block).toContain('locale === "en" ? "Summary" : "요약"');
+    expect(block).toContain('locale === "en" ? "Details" : "자세히 보기"');
+    expect(block).not.toContain("setSelectedProjectSlug(proj.slug);");
   });
 });
