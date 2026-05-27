@@ -1518,6 +1518,11 @@ export default function Admin() {
                     <strong>{candidate.name}</strong>
                     <p>{candidate.desc}</p>
                     <span>★ {candidate.stars}</span>
+                    {candidate.href && (
+                      <a href={candidate.href} target="_blank" rel="noopener noreferrer">
+                        GitHub ↗
+                      </a>
+                    )}
                     {applied && <span className="admin-applied-badge">Applied · not saved</span>}
                   </div>
                   <button type="button" disabled={!canEdit || applied} onClick={() => applyStarredCandidate(candidate)}>{applied ? "Applied" : "Apply"}</button>
@@ -2007,6 +2012,7 @@ export default function Admin() {
               </div>
               <div className="admin-grid">
                 <Field disabled={!canEdit} label="Repo" value={repo.name} onChange={(name) => updateStarredRepo(index, { name })} />
+                <Field disabled={!canEdit} label="URL" value={repo.href} onChange={(href) => updateStarredRepo(index, { href })} />
                 <Field disabled={!canEdit} label="Stars" value={repo.stars} onChange={(stars) => updateStarredRepo(index, { stars })} />
                 <Field disabled={!canEdit} label="Description" value={repo.desc} onChange={(desc) => updateStarredRepo(index, { desc })} />
               </div>

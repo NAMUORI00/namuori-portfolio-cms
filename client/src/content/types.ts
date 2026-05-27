@@ -94,6 +94,7 @@ export interface SkillGroup {
 
 export interface StarredRepo {
   name: string;
+  href: string;
   stars: string;
   desc: string;
 }

@@ -74,8 +74,13 @@ describe("github import function helpers", () => {
   it("maps starred repositories to compact starred candidates", () => {
     expect(repositoryToStarredCandidate(repo)).toEqual({
       name: "NAMUORI00/aerospace-rag",
+      href: "https://github.com/NAMUORI00/aerospace-rag",
       stars: "1.3k",
       desc: "항공우주 문서 검색 RAG 시스템",
     });
+  });
+
+  it("falls back to the full repository name when a starred URL is missing", () => {
+    expect(repositoryToStarredCandidate({ ...repo, html_url: "" }).href).toBe("https://github.com/NAMUORI00/aerospace-rag");
   });
 });

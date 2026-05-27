@@ -73,7 +73,14 @@ describe("validatePortfolioContent", () => {
         },
       ],
       skills: [{ label: "핵심 언어", items: ["Python", "TypeScript"] }],
-      starred: [{ name: "typst/typst", stars: "53.4k", desc: "마크업 기반 조판 시스템" }],
+      starred: [
+        {
+          name: "typst/typst",
+          href: "https://github.com/typst/typst",
+          stars: "53.4k",
+          desc: "마크업 기반 조판 시스템",
+        },
+      ],
       notes: [
         {
           slug: "rag-evaluation",
@@ -97,6 +104,7 @@ describe("validatePortfolioContent", () => {
     expect(result.education[0].type).toBe("education");
     expect(result.education[0].bullets).toEqual(["RAG 아키텍처 연구", "경량 추론 실험"]);
     expect(result.education[0].links[0]).toEqual({ label: "CV", href: "https://namuori.net/cv" });
+    expect(result.starred[0]).toMatchObject({ href: "https://github.com/typst/typst" });
   });
 
   it("normalizes older education entries into timeline entries", () => {

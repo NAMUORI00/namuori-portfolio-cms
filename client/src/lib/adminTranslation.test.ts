@@ -93,7 +93,12 @@ const skills: SkillGroup[] = [
 ];
 
 const starred: StarredRepo[] = [
-  { name: "ggerganov/llama.cpp", stars: "82k", desc: "LLM inference in C/C++" },
+  {
+    name: "ggerganov/llama.cpp",
+    href: "https://github.com/ggerganov/llama.cpp",
+    stars: "82k",
+    desc: "LLM inference in C/C++",
+  },
 ];
 
 describe("admin translation helpers", () => {

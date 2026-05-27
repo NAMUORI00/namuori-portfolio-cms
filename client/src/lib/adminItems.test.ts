@@ -62,7 +62,11 @@ describe("admin item helpers", () => {
       relatedSkills: [],
     });
     expect(createSkillGroup()).toEqual({ label: "새 그룹", items: [] });
-    expect(createStarredRepo().stars).toBe("0");
+    expect(createStarredRepo()).toMatchObject({
+      name: "owner/repository",
+      href: "https://github.com/owner/repository",
+      stars: "0",
+    });
   });
 
   it("duplicates project drafts without publishing the copy", () => {

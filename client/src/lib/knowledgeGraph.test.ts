@@ -66,7 +66,7 @@ const content: PortfolioContent = {
     { label: "핵심 언어", items: ["Python", "TypeScript"] },
     { label: "인프라", items: ["Cloudflare"] },
   ],
-  starred: [{ name: "typst/typst", stars: "53.4k", desc: "마크업 기반 조판 시스템" }],
+  starred: [{ name: "typst/typst", href: "https://github.com/typst/typst", stars: "53.4k", desc: "마크업 기반 조판 시스템" }],
   notes: [
     {
       slug: "rag-evaluation",

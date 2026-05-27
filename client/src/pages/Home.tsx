@@ -1436,15 +1436,26 @@ export default function Home() {
                     gap: "6px",
                     marginBottom: "4px",
                   }}>
-                    <span style={{
-                      fontFamily: FONT_MONO,
-                      fontSize: "0.72rem",
-                      fontWeight: 500,
-                      color: T.text,
-                      wordBreak: "break-all",
-                    }}>
+                    <a
+                      href={repo.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`${repo.name} GitHub repository`}
+                      style={{
+                        fontFamily: FONT_MONO,
+                        fontSize: "0.72rem",
+                        fontWeight: 500,
+                        color: T.green,
+                        textDecoration: "none",
+                        wordBreak: "break-all",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
                       {repo.name}
-                    </span>
+                      <ExternalArrow color={T.green} />
+                    </a>
                     <span style={{
                       fontFamily: FONT_MONO,
                       fontSize: "0.62rem",

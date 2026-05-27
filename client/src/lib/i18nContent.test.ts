@@ -27,7 +27,7 @@ const content: PortfolioContent = {
   research: [{ slug: "rag", title: "검색 증강 생성", desc: "검색 설명", status: "published", showDiagram: true, relatedNotes: [], body: "본문" }],
   projects: [{ slug: "portfolio", name: "포트폴리오", period: "2026", desc: "프로젝트 설명", metric: "성과", tags: ["React"], link: "", highlight: true, private: false, status: "published", relatedNotes: [], body: "프로젝트 본문" }],
   skills: [{ label: "언어", items: ["타입스크립트"] }],
-  starred: [{ name: "vitejs/vite", stars: "75k", desc: "설명" }],
+  starred: [{ name: "vitejs/vite", href: "https://github.com/vitejs/vite", stars: "75k", desc: "설명" }],
   notes: [{ slug: "note", title: "노트", status: "published", date: "2026-05-20", summary: "요약", tags: ["RAG"], relatedProjects: [], relatedResearch: [], body: "노트 본문" }],
 };
 

@@ -121,8 +121,18 @@ export const demoGitHubImportResponse: GitHubImportResponse = {
     { label: "Infra", items: ["Cloudflare", "GitHub Actions"] },
   ],
   starred: [
-    { name: "cloudflare/workers-sdk", stars: "7.2k", desc: "Cloudflare Workers and Pages tooling" },
-    { name: "vitejs/vite", stars: "75k", desc: "Next generation frontend tooling" },
+    {
+      name: "cloudflare/workers-sdk",
+      href: "https://github.com/cloudflare/workers-sdk",
+      stars: "7.2k",
+      desc: "Cloudflare Workers and Pages tooling",
+    },
+    {
+      name: "vitejs/vite",
+      href: "https://github.com/vitejs/vite",
+      stars: "75k",
+      desc: "Next generation frontend tooling",
+    },
   ],
   warnings: ["로컬 미리보기에서는 실제 GitHub API 대신 샘플 후보를 사용합니다."],
 };

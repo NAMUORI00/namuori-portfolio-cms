@@ -86,6 +86,7 @@ export const skillGroupSchema = z.object({
 
 export const starredRepoSchema = z.object({
   name: z.string().min(1),
+  href: z.string().min(1),
   stars: z.string().min(1),
   desc: z.string().min(1),
 });

@@ -172,8 +172,10 @@ export function buildSkillGroupsFromRepositories(repos, languageMaps = []) {
 }
 
 export function repositoryToStarredCandidate(repo) {
+  const fullName = repo.full_name || repo.name || "owner/repository";
   return {
-    name: repo.full_name || repo.name || "owner/repository",
+    name: fullName,
+    href: repo.html_url || `https://github.com/${fullName}`,
     stars: compactStars(repo.stargazers_count),
     desc: repo.description || "GitHub에서 가져온 관심 저장소입니다.",
   };

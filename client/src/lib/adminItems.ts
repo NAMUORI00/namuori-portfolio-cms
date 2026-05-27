@@ -156,6 +156,7 @@ export function createSkillGroup(): SkillGroup {
 export function createStarredRepo(): StarredRepo {
   return {
     name: "owner/repository",
+    href: "https://github.com/owner/repository",
     stars: "0",
     desc: "저장소 설명을 입력하세요.",
   };

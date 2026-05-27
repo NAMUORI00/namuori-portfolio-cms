@@ -66,15 +66,27 @@ describe("github import helpers", () => {
   });
 
   it("appends only missing starred repositories", () => {
-    const current: StarredRepo[] = [{ name: "typst/typst", stars: "40k", desc: "기존" }];
+    const current: StarredRepo[] = [
+      { name: "typst/typst", href: "https://github.com/typst/typst", stars: "40k", desc: "기존" },
+    ];
     const candidates: StarredRepo[] = [
-      { name: "Typst/Typst", stars: "50k", desc: "업데이트 후보" },
-      { name: "cloudflare/workers-sdk", stars: "7.2k", desc: "Workers tooling" },
+      { name: "Typst/Typst", href: "https://github.com/typst/typst", stars: "50k", desc: "업데이트 후보" },
+      {
+        name: "cloudflare/workers-sdk",
+        href: "https://github.com/cloudflare/workers-sdk",
+        stars: "7.2k",
+        desc: "Workers tooling",
+      },
     ];
 
     expect(mergeStarredCandidates(current, candidates)).toEqual([
-      { name: "typst/typst", stars: "40k", desc: "기존" },
-      { name: "cloudflare/workers-sdk", stars: "7.2k", desc: "Workers tooling" },
+      { name: "typst/typst", href: "https://github.com/typst/typst", stars: "40k", desc: "기존" },
+      {
+        name: "cloudflare/workers-sdk",
+        href: "https://github.com/cloudflare/workers-sdk",
+        stars: "7.2k",
+        desc: "Workers tooling",
+      },
     ]);
   });
 
