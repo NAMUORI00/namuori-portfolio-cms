@@ -21,7 +21,7 @@ const content: PortfolioContent = {
     headline: "AI 연구자",
     summaryLead: "한국어 리드",
     summary: ["첫 문단", "둘째 문단"],
-    contacts: [],
+    contacts: [{ id: "blog", type: "external", label: "블로그", href: "https://blog.namuori.net" }],
   },
   education: [{ degree: "석사", school: "학교", period: "2026", note: "노트", current: true }],
   research: [{ slug: "rag", title: "검색 증강 생성", desc: "검색 설명", status: "published", showDiagram: true, relatedNotes: [], body: "본문" }],
@@ -33,11 +33,19 @@ const content: PortfolioContent = {
 
 const en: EnglishTranslations = {
   locale: "en",
+  site: { title: "Portfolio", description: "Description" },
   ui: { nav: { about: "About", projects: "Projects" }, labels: { contact: "CONTACT" } },
-  profile: { status: "Open to work", headline: "AI Researcher", summaryLead: "English lead", summary: ["First paragraph"] },
+  profile: {
+    name: "Kim Yuseok",
+    status: "Open to work",
+    headline: "AI Researcher",
+    summaryLead: "English lead",
+    summary: ["First paragraph"],
+    contacts: { blog: { label: "Blog" } },
+  },
   projects: { portfolio: { name: "Portfolio", desc: "Project description", tags: ["React"], body: "Project body" } },
   research: { rag: { title: "Retrieval-Augmented Generation" } },
-  notes: { note: { title: "Note", summary: "Summary" } },
+  notes: { note: { title: "Note", date: "May 20, 2026", summary: "Summary" } },
   skills: { "언어": { label: "Languages", items: ["TypeScript"] } },
   starred: { "vitejs/vite": { desc: "Frontend tooling" } },
   sourceHashes: {},
@@ -51,14 +59,19 @@ describe("localized portfolio content", () => {
   it("overlays English translations while preserving missing Korean fallbacks", () => {
     const localized = localizePortfolioContent(content, en, "en");
 
+    expect(localized.site.title).toBe("Portfolio");
+    expect(localized.site.description).toBe("Description");
     expect(localized.site.navigation.map((item) => item.label)).toEqual(["About", "Projects"]);
+    expect(localized.profile.name).toBe("Kim Yuseok");
     expect(localized.profile.status).toBe("Open to work");
+    expect(localized.profile.contacts[0].label).toBe("Blog");
     expect(localized.profile.summary).toEqual(["First paragraph", "둘째 문단"]);
     expect(localized.projects[0].name).toBe("Portfolio");
     expect(localized.projects[0].metric).toBe("성과");
     expect(localized.research[0].title).toBe("Retrieval-Augmented Generation");
     expect(localized.skills[0]).toEqual({ label: "Languages", items: ["TypeScript"] });
     expect(localized.starred[0].desc).toBe("Frontend tooling");
+    expect(localized.notes[0].date).toBe("May 20, 2026");
   });
 
   it("looks up translated UI text with fallback", () => {

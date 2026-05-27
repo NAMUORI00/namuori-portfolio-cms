@@ -1,4 +1,4 @@
-export type AdminUxSectionKey = "profile" | "education" | "research" | "projects" | "skills" | "starred" | "notes";
+export type AdminUxSectionKey = "site" | "profile" | "education" | "research" | "projects" | "skills" | "starred" | "notes";
 export type AdminImportScope = "projects" | "skills" | "starred";
 export type AdminAction = "save" | "publish";
 
@@ -24,6 +24,7 @@ export interface EditableSkillGroup {
 }
 
 const SECTION_LABELS: Record<AdminUxSectionKey, string> = {
+  site: "Site / UI",
   profile: "Profile",
   education: "Timeline",
   research: "Research",

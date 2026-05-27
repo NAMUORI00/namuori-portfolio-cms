@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { Link } from "wouter";
-import { englishTranslations, getProfileAvatarUrl, portfolioContent, type ContentOrder, type EducationEntry, type NoteEntry, type PortfolioContent, type ProfileContent, type ProjectEntry, type PublicationStatus, type ResearchEntry, type SkillGroup, type StarredRepo } from "@/content";
+import { englishTranslations, getProfileAvatarUrl, portfolioContent, type ContentOrder, type EducationEntry, type NoteEntry, type PortfolioContent, type ProfileContact, type ProfileContent, type ProjectEntry, type PublicationStatus, type ResearchEntry, type SiteContent, type SkillGroup, type StarredRepo } from "@/content";
 import { DARK, FONT_MONO, FONT_SANS, LIGHT } from "@/content/theme";
 import { useTheme } from "@/contexts/ThemeContext";
 import { adminAccessState, type AdminSessionInfo } from "@/lib/adminAccess";
@@ -72,6 +72,7 @@ type PendingAvatarUpload = AvatarUploadDraft & { fileName: string; previewUrl: s
 type PendingContentCoverUpload = AvatarUploadDraft & { fileName: string; previewUrl: string };
 
 const SECTIONS: Array<{ key: SectionKey; label: string }> = [
+  { key: "site", label: "Site / UI" },
   { key: "profile", label: "Profile" },
   { key: "education", label: "Timeline" },
   { key: "research", label: "Research" },
@@ -82,6 +83,7 @@ const SECTIONS: Array<{ key: SectionKey; label: string }> = [
 ];
 
 const STATUS_OPTIONS: PublicationStatus[] = ["draft", "published", "archived"];
+const CONTACT_TYPE_OPTIONS: ProfileContact["type"][] = ["email", "github", "website", "external"];
 const INITIAL_GITHUB_IMPORT_SOURCE =
   portfolioContent.profile.contacts.find((contact) => contact.type === "github")?.href ?? `https://github.com/${portfolioContent.profile.handle}`;
 
@@ -278,6 +280,7 @@ export default function Admin() {
   const localPreview = import.meta.env.DEV && new URLSearchParams(window.location.search).get("demo") === "1";
   const [session, setSession] = useState<AdminSessionInfo | null>(null);
   const [active, setActive] = useState<SectionKey>("profile");
+  const [site, setSite] = useState<SiteContent>(portfolioContent.site);
   const [profile, setProfile] = useState<ProfileContent>(portfolioContent.profile);
   const [education, setEducation] = useState<EducationEntry[]>(portfolioContent.education);
   const [research, setResearch] = useState<ResearchEntry[]>(portfolioContent.research);
@@ -349,6 +352,7 @@ export default function Admin() {
   }, [active]);
 
   const target = useMemo<SaveTarget>(() => {
+    if (active === "site") return { kind: "site", value: site };
     if (active === "profile") return { kind: "profile", value: profile };
     if (active === "education") return { kind: "education", value: education };
     if (active === "skills") return { kind: "skills", value: skills };
@@ -356,7 +360,7 @@ export default function Admin() {
     if (active === "research") return { kind: "research", value: research[researchIndex], order: contentOrder };
     if (active === "projects") return { kind: "project", value: projects[projectIndex], order: contentOrder };
     return { kind: "note", value: notes[noteIndex], order: contentOrder };
-  }, [active, contentOrder, education, noteIndex, notes, profile, projectIndex, projects, research, researchIndex, skills, starred]);
+  }, [active, contentOrder, education, noteIndex, notes, profile, projectIndex, projects, research, researchIndex, site, skills, starred]);
 
   const baseSavePayload = useMemo<SavePayload>(() => buildSavePayload(target), [target]);
   const savePayload = useMemo<SavePayload>(() => {
@@ -372,6 +376,7 @@ export default function Admin() {
     return baseSavePayload;
   }, [active, avatarUpload, baseSavePayload, coverUploads, projectIndex, projects, research, researchIndex]);
   const translationSource = useMemo<TranslationSource | null>(() => {
+    if (active === "site") return { kind: "site", value: site };
     if (active === "profile") return { kind: "profile", value: profile };
     if (active === "education") return { kind: "education", value: education };
     if (active === "skills") return { kind: "skills", value: skills };
@@ -380,7 +385,7 @@ export default function Admin() {
     if (active === "research" && research[researchIndex]) return { kind: "research", value: research[researchIndex] };
     if (active === "notes" && notes[noteIndex]) return { kind: "note", value: notes[noteIndex] };
     return null;
-  }, [active, education, noteIndex, notes, profile, projectIndex, projects, research, researchIndex, skills, starred]);
+  }, [active, education, noteIndex, notes, profile, projectIndex, projects, research, researchIndex, site, skills, starred]);
   const translationEntries = useMemo<TranslationEntry[]>(
     () => (translationSource ? buildTranslationEntries(translationSource) : []),
     [translationSource],
@@ -412,6 +417,7 @@ export default function Admin() {
   const previewContent = useMemo<PortfolioContent>(
     () => ({
       ...portfolioContent,
+      site,
       profile: previewProfile,
       education,
       research: previewResearch,
@@ -420,7 +426,7 @@ export default function Admin() {
       starred,
       notes,
     }),
-    [education, notes, previewProfile, previewProjects, previewResearch, skills, starred],
+    [education, notes, previewProfile, previewProjects, previewResearch, site, skills, starred],
   );
   const previewSlug = active === "projects" ? projects[projectIndex]?.slug : active === "research" ? research[researchIndex]?.slug : active === "notes" ? notes[noteIndex]?.slug : undefined;
   const adminPreviewUrl = useMemo(() => buildAdminPreviewUrl(previewPathForSection(active, { slug: previewSlug }), previewId, "ko"), [active, previewId, previewSlug]);
@@ -475,6 +481,47 @@ export default function Admin() {
   function updateProfile(next: Partial<ProfileContent>) {
     setProfile((current) => ({ ...current, ...next }));
     markSectionDirty("profile");
+  }
+
+  function updateSite(next: Partial<SiteContent>) {
+    setSite((current) => ({ ...current, ...next }));
+    markSectionDirty("site");
+  }
+
+  function updateNavigationItem(index: number, next: Partial<SiteContent["navigation"][number]>) {
+    setSite((current) => ({ ...current, navigation: updateItem(current.navigation, index, next) }));
+    markSectionDirty("site");
+  }
+
+  function updateProfileContact(index: number, next: Partial<ProfileContact>) {
+    setProfile((current) => ({ ...current, contacts: updateItem(current.contacts, index, next) }));
+    markSectionDirty("profile");
+  }
+
+  function addProfileContact() {
+    const id = `contact-${Date.now().toString(36)}`;
+    const contact: ProfileContact = { id, type: "external", label: "새 연락처", href: "https://" };
+    setProfile((current) => ({
+      ...current,
+      contacts: appendItem(current.contacts, contact).items,
+    }));
+    markSectionDirty("profile");
+    setStatus("새 연락처를 추가했습니다. 저장하면 profile.json에 반영됩니다.");
+  }
+
+  function moveProfileContact(index: number, direction: MoveDirection) {
+    setProfile((current) => ({ ...current, contacts: moveItem(current.contacts, index, direction).items }));
+    markSectionDirty("profile");
+  }
+
+  function removeProfileContact(index: number) {
+    const previous = profile.contacts;
+    setProfile((current) => ({ ...current, contacts: removeItem(current.contacts, index).items }));
+    markSectionDirty("profile");
+    queueUndo("연락처를 제거했습니다. 저장 전에는 되돌릴 수 있습니다.", () => {
+      setProfile((current) => ({ ...current, contacts: previous }));
+      markSectionDirty("profile");
+    });
   }
 
   function updateAvatarUrl(avatarUrl: string) {
@@ -1342,6 +1389,31 @@ export default function Admin() {
   }
 
   function renderEditor() {
+    if (active === "site") {
+      return (
+        <div className="admin-stack">
+          <div className="admin-grid">
+            <Field disabled={!canEdit} label="Site title" value={site.title} onChange={(title) => updateSite({ title })} />
+            <Field disabled={!canEdit} label="Canonical URL" value={site.url} onChange={(url) => updateSite({ url })} />
+            <TextArea disabled={!canEdit} label="Site description" value={site.description} onChange={(description) => updateSite({ description })} rows={3} />
+          </div>
+          <div className="admin-card">
+            <div className="admin-card-head">
+              <strong>Navigation</strong>
+            </div>
+            <div className="admin-stack">
+              {site.navigation.map((item, index) => (
+                <div className="admin-inline-row admin-nav-row" key={editableListKey("site-nav", index)}>
+                  <Field disabled={!canEdit} label="Nav ID" value={item.id} onChange={(id) => updateNavigationItem(index, { id })} />
+                  <Field disabled={!canEdit} label="Nav label" value={item.label} onChange={(label) => updateNavigationItem(index, { label })} />
+                  <Field disabled={!canEdit} label="Nav icon" value={item.icon} onChange={(icon) => updateNavigationItem(index, { icon })} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
     if (active === "profile") {
       return (
         <div className="admin-stack">
@@ -1372,6 +1444,27 @@ export default function Admin() {
             <TextArea disabled={!canEdit} label="Headline" value={profile.headline} onChange={(headline) => updateProfile({ headline })} rows={3} />
             <TextArea disabled={!canEdit} label="Lead" value={profile.summaryLead} onChange={(summaryLead) => updateProfile({ summaryLead })} rows={4} />
             <TextArea disabled={!canEdit} label="Summary paragraphs" value={profile.summary.join("\n\n")} onChange={(value) => updateProfile({ summary: value.split(/\n\s*\n/).filter(Boolean) })} rows={8} />
+            <div className="admin-card admin-contact-card">
+              <div className="admin-card-head">
+                <strong>Contacts</strong>
+                <div className="admin-card-actions">
+                  <ControlButton disabled={!canEdit} onClick={addProfileContact}>Add contact</ControlButton>
+                </div>
+              </div>
+              {profile.contacts.map((contact, index) => (
+                <div className="admin-contact-row" key={editableListKey("profile-contact", index)}>
+                  <SelectField disabled={!canEdit} label="Contact type" value={contact.type} options={CONTACT_TYPE_OPTIONS} onChange={(type) => updateProfileContact(index, { type })} />
+                  <Field disabled={!canEdit} label="Contact ID" value={contact.id} onChange={(id) => updateProfileContact(index, { id })} />
+                  <Field disabled={!canEdit} label="Contact label" value={contact.label} onChange={(label) => updateProfileContact(index, { label })} />
+                  <Field disabled={!canEdit} label="Contact href" value={contact.href} onChange={(href) => updateProfileContact(index, { href })} />
+                  <div className="admin-card-actions">
+                    <ControlButton disabled={!canEdit || index === 0} onClick={() => moveProfileContact(index, "up")}>Up</ControlButton>
+                    <ControlButton disabled={!canEdit || index === profile.contacts.length - 1} onClick={() => moveProfileContact(index, "down")}>Down</ControlButton>
+                    <ControlButton danger disabled={!canEdit} onClick={() => removeProfileContact(index)}>Remove</ControlButton>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       );
@@ -1882,6 +1975,13 @@ export default function Admin() {
         .admin-check-field input { width: 16px; height: 16px; accent-color: ${T.green}; }
         .admin-inline-list { display: grid; gap: 8px; color: ${T.sub}; font-size: .78rem; font-family: ${FONT_MONO}; }
         .admin-inline-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto auto auto; gap: 8px; align-items: center; }
+        .admin-nav-row { grid-template-columns: minmax(120px, .8fr) minmax(160px, 1.2fr) minmax(100px, .7fr); align-items: end; }
+        .admin-contact-card { grid-column: 1 / -1; }
+        .admin-contact-row {
+          border: 1px solid ${T.border}; background: ${T.bg}; border-radius: 6px; padding: 12px;
+          display: grid; grid-template-columns: minmax(120px, .7fr) minmax(120px, .8fr) minmax(160px, 1fr) minmax(220px, 1.4fr) auto;
+          gap: 10px; align-items: end;
+        }
         .admin-empty { border: 1px dashed ${T.border}; border-radius: 6px; padding: 18px; color: ${T.sub}; }
         .admin-editor { display: grid; gap: 10px; }
         .admin-editor-bar { display: flex; justify-content: space-between; align-items: center; color: ${T.sub}; font-family: ${FONT_MONO}; font-size: .78rem; }
@@ -1901,6 +2001,7 @@ export default function Admin() {
           .admin-import-form { grid-template-columns: 1fr; }
           .admin-candidate { grid-template-columns: 1fr; }
           .admin-inline-row { grid-template-columns: 1fr; }
+          .admin-nav-row, .admin-contact-row { grid-template-columns: 1fr; }
           .admin-translation-head { flex-direction: column; }
           .admin-translation-actions { justify-content: flex-start; }
           .admin-translation-list { grid-template-columns: 1fr; }

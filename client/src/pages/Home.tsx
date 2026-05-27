@@ -26,6 +26,7 @@ import { KnowledgeGraphRail } from "@/components/KnowledgeGraphRail";
 import { MobileKnowledgeGraph } from "@/components/MobileKnowledgeGraph";
 import { readAdminPreviewDraftFromLocation, withAdminPreviewUrl } from "@/lib/adminPreview";
 import { buildCoverPreview, buildResearchDiagramPreview, type CoverPreviewPayload } from "@/lib/coverPreview";
+import { applyDocumentMetadata } from "@/lib/documentMetadata";
 import { localizePortfolioContent, uiText } from "@/lib/i18nContent";
 import { buildKnowledgeGraph } from "@/lib/knowledgeGraph";
 import { activeSectionForAnchor, scrollEndPaddingForCenteredSection, scrollTopForElementCenter } from "@/lib/scroll";
@@ -429,6 +430,11 @@ export default function Home() {
   const sourceContent = previewDraft?.content ?? portfolioContent;
   const sourceTranslations = previewDraft?.translations ?? englishTranslations;
   const content = useMemo(() => localizePortfolioContent(sourceContent, sourceTranslations, locale), [locale, sourceContent, sourceTranslations]);
+
+  useEffect(() => {
+    applyDocumentMetadata(content.site, locale);
+  }, [content.site, locale]);
+
   const IMG = content.site.images;
   const NAV_ITEMS = content.site.navigation;
   const NAV_IDS = useMemo(() => NAV_ITEMS.map((item) => item.id), [NAV_ITEMS]);

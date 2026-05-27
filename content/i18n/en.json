@@ -1,5 +1,9 @@
 {
   "locale": "en",
+  "site": {
+    "title": "Kim Yuseok | AI Research Engineer Portfolio",
+    "description": "CS/AI master's student focused on LLM systems, RAG architecture, and lightweight inference research."
+  },
   "ui": {
     "nav": {
       "about": "About",
@@ -26,11 +30,24 @@
     }
   },
   "sourceHashes": {
+    "site.title": "fopv3a",
+    "site.description": "ta8bde",
+    "site.navigation.about.label": "5lojpx",
+    "site.navigation.education.label": "jjrlpf",
+    "site.navigation.research.label": "1srr2xt",
+    "site.navigation.projects.label": "1vjr8a0",
+    "site.navigation.skills.label": "mjsd1o",
+    "site.navigation.interests.label": "1khv4xc",
+    "profile.name": "1d3fd1s",
     "profile.status": "jfm2jg",
     "profile.headline": "791qbr",
     "profile.summaryLead": "mqga3m",
     "profile.summary.0": "1dld3ip",
     "profile.summary.1": "x12mcr",
+    "profile.contacts.email.label": "x8rsua",
+    "profile.contacts.github.label": "f84ij7",
+    "profile.contacts.website.label": "wswc8z",
+    "profile.contacts.blog.label": "10scel7",
     "projects.aerospace-rag.name": "19un6i1",
     "projects.aerospace-rag.period": "372puo",
     "projects.aerospace-rag.desc": "m5c61o",
@@ -105,6 +122,7 @@
     "research.rag.desc": "p6upkk",
     "research.rag.body": "1l7ekfh",
     "notes.rag-evaluation.title": "oq5na6",
+    "notes.rag-evaluation.date": "1k8xxdy",
     "notes.rag-evaluation.summary": "eskc0l",
     "notes.rag-evaluation.tags.0": "15us9xd",
     "notes.rag-evaluation.tags.1": "1p47csf",
@@ -114,6 +132,7 @@
   },
   "generatedAt": "2026-05-26T23:03:57.440Z",
   "profile": {
+    "name": "Kim Yuseok",
     "status": "Study focus and finding future job.",
     "headline": "CS/AI Master's Degree in AI Research · Engineer Perspective",
     "summaryLead": "A software engineer who builds efficient and scalable systems with a passion for the intersection of algorithms and machine learning inspired by nature.",
@@ -122,7 +141,21 @@
       "Currently in the CS/AI master’s program, we focus on research/development aimed at research and engineering careers in the fields of LLM systems and RAG architecture.",
       "Since graduation, the majority of projects related to deployment have been interested in deployment, environmental matching and automation, and they have built experimental environments that can be replicated with DevContainer and Docker.",
       "As a hobby, we are experimenting with various domains such as voice/voice-related model learning, Edge Environment LLM reasoning, and real-time voice conversion, and we are conducting a top project."
-    ]
+    ],
+    "contacts": {
+      "email": {
+        "label": "namuori00@namuori.net"
+      },
+      "github": {
+        "label": "github.com/NAMUORI00"
+      },
+      "website": {
+        "label": "namuori.net"
+      },
+      "blog": {
+        "label": "blog.namuori.net"
+      }
+    }
   },
   "education": [
     {
@@ -322,6 +355,7 @@
   "notes": {
     "rag-evaluation": {
       "title": "RAG Evaluation Notes",
+      "date": "May 20, 2026",
       "summary": "A practical evaluation lens for comparing RAG systems across retrieval quality, answer grounding, and operating cost.",
       "tags": [
         "RAG",

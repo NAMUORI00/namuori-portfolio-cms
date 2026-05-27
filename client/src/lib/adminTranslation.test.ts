@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EducationEntry, NoteEntry, ProfileContent, ProjectEntry, ResearchEntry, SkillGroup, StarredRepo } from "@/content";
+import type { EducationEntry, NoteEntry, PortfolioContent, ProfileContent, ProjectEntry, ResearchEntry, SkillGroup, StarredRepo } from "@/content";
 import {
   applyTranslationValues,
   buildTranslationEntries,
@@ -18,7 +18,18 @@ const profile: ProfileContent = {
   headline: "AI 연구자",
   summaryLead: "리드",
   summary: ["첫 문단"],
-  contacts: [],
+  contacts: [{ id: "blog", type: "external", label: "블로그", href: "https://blog.namuori.net" }],
+};
+
+const site: PortfolioContent["site"] = {
+  title: "김유석 | AI 연구 엔지니어 포트폴리오",
+  description: "CS/AI 석사 진학 중",
+  url: "https://namuori.net",
+  navigation: [
+    { id: "about", label: "소개", icon: "user" },
+    { id: "projects", label: "프로젝트", icon: "code" },
+  ],
+  images: { heroTree: "tree", ragDiagram: "rag", dotPattern: "dot" },
 };
 
 const project: ProjectEntry = {
@@ -73,15 +84,24 @@ const starred: StarredRepo[] = [
 describe("admin translation helpers", () => {
   it("builds translation entries for editable content", () => {
     expect(buildTranslationEntries({ kind: "profile", value: profile }).map((entry) => entry.key)).toEqual([
+      "profile.name",
       "profile.status",
       "profile.headline",
       "profile.summaryLead",
       "profile.summary.0",
+      "profile.contacts.blog.label",
+    ]);
+
+    expect(buildTranslationEntries({ kind: "site", value: site } as any).map((entry) => entry.key)).toEqual([
+      "site.title",
+      "site.description",
+      "site.navigation.about.label",
+      "site.navigation.projects.label",
     ]);
 
     expect(buildTranslationEntries({ kind: "project", value: project }).map((entry) => entry.key)).toContain("projects.portfolio.body");
     expect(buildTranslationEntries({ kind: "research", value: research }).map((entry) => entry.key)).toContain("research.rag.title");
-    expect(buildTranslationEntries({ kind: "note", value: note }).map((entry) => entry.key)).toContain("notes.note.summary");
+    expect(buildTranslationEntries({ kind: "note", value: note }).map((entry) => entry.key)).toContain("notes.note.date");
     expect(buildTranslationEntries({ kind: "education", value: education }).map((entry) => entry.key)).toEqual([
       "education.0.degree",
       "education.0.school",
@@ -143,6 +163,27 @@ describe("admin translation helpers", () => {
     expect(getTranslationValue(translated, "starred.ggerganov%2Fllama%2Ecpp.desc")).toBe("LLM inference in C/C++");
   });
 
+  it("applies translations for site, profile names, contact labels, and note dates", () => {
+    const entries = [
+      ...buildTranslationEntries({ kind: "site", value: site } as any),
+      ...buildTranslationEntries({ kind: "profile", value: profile }),
+      ...buildTranslationEntries({ kind: "note", value: note }),
+    ];
+    const translated = applyTranslationValues(createEnglishTranslations(), entries, {
+      "site.title": "Kim Yuseok | AI Research Engineer Portfolio",
+      "site.navigation.about.label": "About",
+      "profile.name": "Kim Yuseok",
+      "profile.contacts.blog.label": "Blog",
+      "notes.note.date": "May 20, 2026",
+    });
+
+    expect(getTranslationValue(translated, "site.title")).toBe("Kim Yuseok | AI Research Engineer Portfolio");
+    expect(getTranslationValue(translated, "site.navigation.about.label")).toBe("About");
+    expect(getTranslationValue(translated, "profile.name")).toBe("Kim Yuseok");
+    expect(getTranslationValue(translated, "profile.contacts.blog.label")).toBe("Blog");
+    expect(getTranslationValue(translated, "notes.note.date")).toBe("May 20, 2026");
+  });
+
   it("reports stale translations when Korean source changes", () => {
     const source: TranslationSource = { kind: "profile", value: profile };
     const translated = applyTranslationValues(createEnglishTranslations(), buildTranslationEntries(source), {
@@ -150,7 +191,7 @@ describe("admin translation helpers", () => {
     });
     const changed = { ...profile, headline: "LLM 연구자" };
 
-    expect(translationStats(translated, source)).toEqual({ total: 4, translated: 1, stale: 0 });
-    expect(translationStats(translated, { kind: "profile", value: changed })).toEqual({ total: 4, translated: 1, stale: 1 });
+    expect(translationStats(translated, source)).toEqual({ total: 6, translated: 1, stale: 0 });
+    expect(translationStats(translated, { kind: "profile", value: changed })).toEqual({ total: 6, translated: 1, stale: 1 });
   });
 });

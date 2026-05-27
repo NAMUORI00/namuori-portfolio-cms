@@ -115,10 +115,12 @@ export type {
   ContentOrder,
   NoteEntry,
   PortfolioContent,
+  ProfileContact,
   ProfileContent,
   ProjectEntry,
   PublicationStatus,
   ResearchEntry,
   SkillGroup,
+  SiteContent,
   StarredRepo,
 } from "./types";

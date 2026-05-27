@@ -19,6 +19,7 @@ export interface SiteContent {
 }
 
 export interface ProfileContact {
+  id: string;
   type: "email" | "github" | "website" | "external";
   label: string;
   href: string;

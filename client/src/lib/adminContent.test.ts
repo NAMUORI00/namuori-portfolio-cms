@@ -9,7 +9,7 @@ import {
   serializeProject,
   serializeResearch,
 } from "./adminContent";
-import type { ContentOrder, NoteEntry, ProfileContent, ProjectEntry, ResearchEntry } from "@/content";
+import type { ContentOrder, NoteEntry, ProfileContent, ProjectEntry, ResearchEntry, SiteContent } from "@/content";
 
 const project: ProjectEntry = {
   slug: "aerospace-rag",
@@ -59,7 +59,15 @@ const profile: ProfileContent = {
   headline: "AI 연구 · 엔지니어 지망",
   summaryLead: "효율적이고 확장 가능한 시스템을 구축하는 소프트웨어 엔지니어입니다.",
   summary: ["본문"],
-  contacts: [],
+  contacts: [{ id: "github", type: "github", label: "github.com/NAMUORI00", href: "https://github.com/NAMUORI00" }],
+};
+
+const site: SiteContent = {
+  title: "김유석 | AI 연구 엔지니어 포트폴리오",
+  description: "CS/AI 석사 진학 중",
+  url: "https://namuori.net",
+  navigation: [{ id: "about", label: "소개", icon: "user" }],
+  images: { heroTree: "tree", ragDiagram: "rag", dotPattern: "dot" },
 };
 
 const order: ContentOrder = {
@@ -112,6 +120,17 @@ describe("admin content helpers", () => {
       content: expect.stringContaining('"status": "구직 중"'),
     });
     expect(payload.files[0].content).toContain('"avatarUrl": "https://github.com/NAMUORI00.png"');
+  });
+
+  it("builds a save payload for site settings", () => {
+    const payload = buildSavePayload({ kind: "site", value: site });
+
+    expect(payload.branch).toBe("draft/site");
+    expect(payload.message).toBe("Update site settings");
+    expect(payload.files[0]).toEqual({
+      path: "content/site.json",
+      content: `${JSON.stringify(site, null, 2)}\n`,
+    });
   });
 
   it("appends binary files without mutating the original save payload", () => {

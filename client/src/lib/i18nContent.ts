@@ -2,29 +2,38 @@ import type {
   EducationEntry,
   NoteEntry,
   PortfolioContent,
+  ProfileContact,
   ProfileContent,
   ProjectEntry,
   ResearchEntry,
   SkillGroup,
+  SiteContent,
   StarredRepo,
 } from "@/content";
 
 export type Locale = "ko" | "en";
 
+type EnglishProfileTranslations = Partial<Pick<ProfileContent, "name" | "status" | "headline" | "summaryLead" | "summary">> & {
+  contacts?: Record<string, Partial<Pick<ProfileContact, "label">>>;
+};
+
+type EnglishSiteTranslations = Partial<Pick<SiteContent, "title" | "description">>;
+
 export interface EnglishTranslations {
   locale: "en";
   generatedAt?: string;
+  site?: EnglishSiteTranslations;
   ui?: {
     nav?: Record<string, string>;
     labels?: Record<string, string>;
   };
-  profile?: Partial<Pick<ProfileContent, "status" | "headline" | "summaryLead" | "summary">>;
+  profile?: EnglishProfileTranslations;
   education?: Array<Partial<Pick<EducationEntry, "degree" | "school" | "period" | "note">>>;
   research?: Record<string, Partial<Pick<ResearchEntry, "title" | "desc" | "body">>>;
   projects?: Record<string, Partial<Pick<ProjectEntry, "name" | "period" | "desc" | "metric" | "tags" | "body">>>;
   skills?: Record<string, Partial<Pick<SkillGroup, "label" | "items">>>;
   starred?: Record<string, Partial<Pick<StarredRepo, "desc">>>;
-  notes?: Record<string, Partial<Pick<NoteEntry, "title" | "summary" | "tags" | "body">>>;
+  notes?: Record<string, Partial<Pick<NoteEntry, "title" | "date" | "summary" | "tags" | "body">>>;
   sourceHashes?: Record<string, string>;
 }
 
@@ -43,11 +52,14 @@ export function uiText(translations: EnglishTranslations, key: string, fallback:
 
 export function localizePortfolioContent(content: PortfolioContent, translations: EnglishTranslations, locale: Locale): PortfolioContent {
   if (locale === "ko") return content;
+  const profileTranslations = translations.profile ?? {};
+  const { contacts: translatedContacts, summary: translatedSummary, ...profileTextTranslations } = profileTranslations;
 
   return {
     ...content,
     site: {
       ...content.site,
+      ...translations.site,
       navigation: content.site.navigation.map((item) => ({
         ...item,
         label: translations.ui?.nav?.[item.id] || item.label,
@@ -55,8 +67,9 @@ export function localizePortfolioContent(content: PortfolioContent, translations
     },
     profile: {
       ...content.profile,
-      ...translations.profile,
-      summary: mergeArray(content.profile.summary, translations.profile?.summary),
+      ...profileTextTranslations,
+      summary: mergeArray(content.profile.summary, translatedSummary),
+      contacts: content.profile.contacts.map((contact) => ({ ...contact, ...(translatedContacts?.[contact.id] ?? {}) })),
     },
     education: content.education.map((item, index) => ({ ...item, ...(translations.education?.[index] ?? {}) })),
     research: content.research.map((item) => ({ ...item, ...(translations.research?.[item.slug] ?? {}) })),

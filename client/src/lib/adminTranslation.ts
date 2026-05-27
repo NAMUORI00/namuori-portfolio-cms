@@ -1,7 +1,8 @@
-import type { EducationEntry, NoteEntry, ProfileContent, ProjectEntry, ResearchEntry, SkillGroup, StarredRepo } from "@/content";
+import type { EducationEntry, NoteEntry, ProfileContent, ProjectEntry, ResearchEntry, SkillGroup, SiteContent, StarredRepo } from "@/content";
 import { createEnglishTranslations, type EnglishTranslations } from "./i18nContent";
 
 export type TranslationSource =
+  | { kind: "site"; value: SiteContent }
   | { kind: "profile"; value: ProfileContent }
   | { kind: "education"; value: EducationEntry[] }
   | { kind: "project"; value: ProjectEntry }
@@ -45,12 +46,24 @@ function decodeKeySegment(value: string): string {
 }
 
 export function buildTranslationEntries(source: TranslationSource): TranslationEntry[] {
+  if (source.kind === "site") {
+    return [
+      ...entry("site.title", "Site title", source.value.title),
+      ...entry("site.description", "Site description", source.value.description),
+      ...source.value.navigation.flatMap((item) => entry(`site.navigation.${encodeKeySegment(item.id)}.label`, `Navigation: ${item.label}`, item.label)),
+    ];
+  }
+
   if (source.kind === "profile") {
     return [
+      ...entry("profile.name", "Profile name", source.value.name),
       ...entry("profile.status", "Profile status", source.value.status),
       ...entry("profile.headline", "Profile headline", source.value.headline),
       ...entry("profile.summaryLead", "Profile lead", source.value.summaryLead),
       ...source.value.summary.flatMap((paragraph, index) => entry(`profile.summary.${index}`, `Profile paragraph ${index + 1}`, paragraph)),
+      ...source.value.contacts.flatMap((contact) =>
+        entry(`profile.contacts.${encodeKeySegment(contact.id)}.label`, `Contact label: ${contact.label}`, contact.label),
+      ),
     ];
   }
 
@@ -103,6 +116,7 @@ export function buildTranslationEntries(source: TranslationSource): TranslationE
   const slug = source.value.slug;
   return [
     ...entry(`notes.${slug}.title`, "Note title", source.value.title),
+    ...entry(`notes.${slug}.date`, "Note date", source.value.date),
     ...entry(`notes.${slug}.summary`, "Note summary", source.value.summary),
     ...source.value.tags.flatMap((tag, index) => entry(`notes.${slug}.tags.${index}`, `Note tag ${index + 1}`, tag)),
     ...entry(`notes.${slug}.body`, "Note body", source.value.body),
@@ -113,8 +127,15 @@ function cloneTranslations(translations: EnglishTranslations): EnglishTranslatio
   return {
     ...createEnglishTranslations(),
     ...translations,
+    site: translations.site ? { ...translations.site } : undefined,
     ui: { ...translations.ui, nav: { ...translations.ui?.nav }, labels: { ...translations.ui?.labels } },
-    profile: translations.profile ? { ...translations.profile, summary: [...(translations.profile.summary ?? [])] } : undefined,
+    profile: translations.profile
+      ? {
+          ...translations.profile,
+          summary: [...(translations.profile.summary ?? [])],
+          contacts: Object.fromEntries(Object.entries(translations.profile.contacts ?? {}).map(([key, value]) => [key, { ...value }])),
+        }
+      : undefined,
     education: translations.education?.map((item) => ({ ...item })),
     research: Object.fromEntries(Object.entries(translations.research ?? {}).map(([key, value]) => [key, { ...value }])),
     projects: Object.fromEntries(Object.entries(translations.projects ?? {}).map(([key, value]) => [key, { ...value, tags: value.tags ? [...value.tags] : undefined }])),
@@ -133,6 +154,9 @@ function ensureArrayItem<T>(items: T[] | undefined, index: number, create: () =>
 
 export function getTranslationValue(translations: EnglishTranslations, key: string): string {
   const parts = key.split(".");
+  if (parts[0] === "site" && parts[1] === "navigation") return translations.ui?.nav?.[decodeKeySegment(parts[2])] ?? "";
+  if (parts[0] === "site") return String(translations.site?.[parts[1] as keyof NonNullable<EnglishTranslations["site"]>] ?? "");
+  if (parts[0] === "profile" && parts[1] === "contacts") return translations.profile?.contacts?.[decodeKeySegment(parts[2])]?.label ?? "";
   if (parts[0] === "profile" && parts[1] === "summary") return translations.profile?.summary?.[Number(parts[2])] ?? "";
   if (parts[0] === "profile") return String(translations.profile?.[parts[1] as keyof NonNullable<EnglishTranslations["profile"]>] ?? "");
   if (parts[0] === "education") return String(translations.education?.[Number(parts[1])]?.[parts[2] as keyof NonNullable<EnglishTranslations["education"]>[number]] ?? "");
@@ -149,13 +173,28 @@ export function getTranslationValue(translations: EnglishTranslations, key: stri
 
 function setTranslationValue(translations: EnglishTranslations, key: string, value: string) {
   const parts = key.split(".");
+  if (parts[0] === "site") {
+    if (parts[1] === "navigation") {
+      translations.ui = translations.ui ?? {};
+      translations.ui.nav = translations.ui.nav ?? {};
+      translations.ui.nav[decodeKeySegment(parts[2])] = value;
+    } else {
+      translations.site = translations.site ?? {};
+      translations.site[parts[1] as "title" | "description"] = value;
+    }
+  }
   if (parts[0] === "profile") {
     translations.profile = translations.profile ?? {};
-    if (parts[1] === "summary") {
+    if (parts[1] === "contacts") {
+      translations.profile.contacts = translations.profile.contacts ?? {};
+      const contactId = decodeKeySegment(parts[2]);
+      translations.profile.contacts[contactId] = translations.profile.contacts[contactId] ?? {};
+      translations.profile.contacts[contactId].label = value;
+    } else if (parts[1] === "summary") {
       translations.profile.summary = ensureArrayItem(translations.profile.summary, Number(parts[2]), () => "");
       translations.profile.summary[Number(parts[2])] = value;
     } else {
-      translations.profile[parts[1] as "status" | "headline" | "summaryLead"] = value;
+      translations.profile[parts[1] as "name" | "status" | "headline" | "summaryLead"] = value;
     }
   }
   if (parts[0] === "education") {
@@ -200,7 +239,7 @@ function setTranslationValue(translations: EnglishTranslations, key: string, val
       note.tags = ensureArrayItem(note.tags, Number(parts[3]), () => "");
       note.tags[Number(parts[3])] = value;
     } else {
-      note[parts[2] as "title" | "summary" | "body"] = value;
+      note[parts[2] as "title" | "date" | "summary" | "body"] = value;
     }
   }
 }

@@ -1,11 +1,12 @@
 import { Link, useRoute } from "wouter";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { englishTranslations, portfolioContent } from "@/content";
 import { toMarkdownHtml } from "@/content/markdown";
 import { DARK, FONT_MONO, FONT_SANS, LIGHT } from "@/content/theme";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { readAdminPreviewDraftFromLocation, withAdminPreviewUrl } from "@/lib/adminPreview";
+import { applyDocumentMetadata } from "@/lib/documentMetadata";
 import { localizePortfolioContent, uiText } from "@/lib/i18nContent";
 
 function usePalette() {
@@ -16,6 +17,9 @@ function usePalette() {
   const sourceContent = previewDraft?.content ?? portfolioContent;
   const sourceTranslations = previewDraft?.translations ?? englishTranslations;
   const content = useMemo(() => localizePortfolioContent(sourceContent, sourceTranslations, locale), [locale, sourceContent, sourceTranslations]);
+  useEffect(() => {
+    applyDocumentMetadata(content.site, locale);
+  }, [content.site, locale]);
   const label = (key: string, fallback: string) => (locale === "en" ? uiText(sourceTranslations, key, fallback) : fallback);
   const previewHref = (path: string) => withAdminPreviewUrl(path, previewId);
   return { T: theme === "dark" ? DARK : LIGHT, theme, toggleTheme, locale, toggleLocale, content, label, previewHref };

@@ -26,6 +26,7 @@ export const profileSchema = z.object({
   summary: z.array(z.string()),
   contacts: z.array(
     z.object({
+      id: z.string().min(1),
       type: z.enum(["email", "github", "website", "external"]),
       label: z.string().min(1),
       href: z.string().min(1),

@@ -23,7 +23,7 @@ describe("validatePortfolioContent", () => {
         headline: "AI 연구 · 엔지니어 지망",
         summaryLead: "효율적이고 확장 가능한 시스템을 구축하는 소프트웨어 엔지니어입니다.",
         summary: ["Python 기반 AI 실험부터 웹 프론트엔드까지 다룹니다."],
-        contacts: [{ label: "github.com/NAMUORI00", href: "https://github.com/NAMUORI00", type: "github" }],
+        contacts: [{ id: "github", label: "github.com/NAMUORI00", href: "https://github.com/NAMUORI00", type: "github" }],
       },
       education: [
         {

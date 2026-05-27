@@ -7,6 +7,7 @@ import type {
   ProjectEntry,
   ResearchEntry,
   SkillGroup,
+  SiteContent,
   StarredRepo,
 } from "@/content";
 
@@ -23,6 +24,7 @@ export interface SavePayload {
 }
 
 export type SaveTarget =
+  | { kind: "site"; value: SiteContent }
   | { kind: "profile"; value: ProfileContent }
   | { kind: "education"; value: EducationEntry[] }
   | { kind: "skills"; value: SkillGroup[] }
@@ -128,6 +130,13 @@ export function serializeNote(note: NoteEntry): SaveFile {
 }
 
 export function buildSavePayload(target: SaveTarget): SavePayload {
+  if (target.kind === "site") {
+    return {
+      branch: "draft/site",
+      message: "Update site settings",
+      files: [jsonFile("content/site.json", target.value)],
+    };
+  }
   if (target.kind === "profile") {
     return {
       branch: "draft/profile",
