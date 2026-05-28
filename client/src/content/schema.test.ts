@@ -237,6 +237,36 @@ describe("validatePortfolioContent", () => {
     expect(result.profile.avatarUrl).toBe("https://github.com/NAMUORI00.png");
   });
 
+  it("rejects unsafe persisted URLs", () => {
+    expect(() =>
+      validatePortfolioContent({
+        site: {
+          title: "x",
+          description: "x",
+          url: "https://example.com",
+          navigation: [],
+          images: { heroTree: "x", ragDiagram: "x", dotPattern: "x" },
+        },
+        profile: {
+          name: "x",
+          romanizedName: "x",
+          handle: "x",
+          status: "x",
+          headline: "x",
+          summaryLead: "x",
+          summary: [],
+          contacts: [{ id: "bad", type: "external", label: "bad", href: "javascript:alert(1)" }],
+        },
+        education: [{ degree: "x", school: "x", period: "x", note: "", current: false, links: [{ label: "bad", href: "data:text/html,x" }] }],
+        research: [{ slug: "r", title: "r", desc: "r", status: "published", coverImage: "javascript:alert(1)", showDiagram: false, body: "", relatedNotes: [] }],
+        projects: [{ slug: "p", name: "p", period: "p", desc: "p", metric: "p", tags: [], link: "javascript:alert(1)", highlight: false, private: false, status: "published", body: "", relatedNotes: [] }],
+        skills: [],
+        starred: [{ name: "bad", href: "javascript:alert(1)", stars: "0", desc: "bad" }],
+        notes: [],
+      }),
+    ).toThrow(/unsafe url/i);
+  });
+
   it("rejects duplicate slugs", () => {
     expect(() =>
       validatePortfolioContent({

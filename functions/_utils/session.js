@@ -19,6 +19,17 @@ async function hmac(secret, value) {
   return base64url(new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(value))));
 }
 
+function timingSafeEqual(left, right) {
+  const leftBytes = encoder.encode(left);
+  const rightBytes = encoder.encode(right);
+  const length = Math.max(leftBytes.length, rightBytes.length);
+  let diff = leftBytes.length ^ rightBytes.length;
+  for (let index = 0; index < length; index += 1) {
+    diff |= (leftBytes[index] || 0) ^ (rightBytes[index] || 0);
+  }
+  return diff === 0;
+}
+
 function sessionSecret(env) {
   if (!env.SESSION_SECRET) {
     throw new Error("SESSION_SECRET is not configured");
@@ -43,10 +54,14 @@ export async function readSession(env, request) {
   const [encoded, signature] = raw.split(".");
   if (!encoded || !signature) return null;
   const expected = await hmac(sessionSecret(env), encoded);
-  if (expected !== signature) return null;
-  const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(fromBase64url(encoded), (char) => char.charCodeAt(0))));
-  if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
-  return { login: String(payload.login) };
+  if (!timingSafeEqual(expected, signature)) return null;
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(Uint8Array.from(fromBase64url(encoded), (char) => char.charCodeAt(0))));
+    if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return { login: String(payload.login) };
+  } catch {
+    return null;
+  }
 }
 
 export async function requireSession(env, request) {

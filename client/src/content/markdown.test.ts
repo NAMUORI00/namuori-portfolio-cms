@@ -76,4 +76,12 @@ featured: true
     expect(html).toContain('href="https://example.com"');
     expect(toMarkdownHtml("<script>alert(1)</script>")).not.toContain("<script>");
   });
+
+  it("does not render unsafe markdown link schemes or raw HTML event handlers", () => {
+    const html = toMarkdownHtml("[bad](javascript:alert(1))\n\n<img src=x onerror=alert(1)>");
+
+    expect(html).not.toContain('href="javascript:');
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;img");
+  });
 });

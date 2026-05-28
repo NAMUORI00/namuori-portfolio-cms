@@ -6,6 +6,7 @@ import {
   repositoryToProjectCandidate,
   repositoryToStarredCandidate,
 } from "../../_utils/githubImport.js";
+import { requireAdminMutationRequest } from "../../_utils/security.js";
 import { requireSession } from "../../_utils/session.js";
 
 async function optionalGitHubFetch(env, path, warnings, label) {
@@ -88,6 +89,8 @@ async function importProfile(env, source) {
 export async function onRequestPost({ env, request }) {
   const auth = await requireSession(env, request);
   if (auth.response) return auth.response;
+  const mutation = requireAdminMutationRequest(env, request);
+  if (mutation) return mutation;
 
   let payload;
   try {

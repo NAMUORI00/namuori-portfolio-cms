@@ -18,10 +18,42 @@ const projectEvaluationSchema = z.object({
   method: z.string().optional(),
 });
 
+function isSafePersistedUrl(value: string, { allowEmpty = false }: { allowEmpty?: boolean } = {}): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return allowEmpty;
+  if (/[\u0000-\u001f\u007f\s]/.test(trimmed)) return false;
+  if (trimmed.startsWith("/")) {
+    if (trimmed.startsWith("//") || trimmed.includes("\\")) return false;
+    return /^\/[A-Za-z0-9가-힣._~:/?#[\]@!$&'()*+,;=%-]*$/.test(trimmed);
+  }
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "https:" || url.protocol === "mailto:";
+  } catch {
+    return false;
+  }
+}
+
+function safeUrlSchema({ allowEmpty = false }: { allowEmpty?: boolean } = {}) {
+  return z.string().superRefine((value, ctx) => {
+    if (!isSafePersistedUrl(value, { allowEmpty })) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Unsafe URL: ${value}` });
+    }
+  });
+}
+
+function optionalSafeUrlSchema() {
+  return z.string().optional().superRefine((value, ctx) => {
+    if (value !== undefined && !isSafePersistedUrl(value, { allowEmpty: true })) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Unsafe URL: ${value}` });
+    }
+  });
+}
+
 export const siteSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
-  url: z.string().min(1),
+  url: safeUrlSchema(),
   navigation: z.array(z.object({ id: z.string().min(1), label: z.string().min(1), icon: z.string().min(1) })),
   images: z.object({
     heroTree: z.string().min(1),
@@ -35,7 +67,7 @@ export const profileSchema = z.object({
   romanizedName: z.string().min(1),
   handle: z.string().min(1),
   status: z.string().min(1),
-  avatarUrl: z.string().optional(),
+  avatarUrl: optionalSafeUrlSchema(),
   headline: z.string().min(1),
   summaryLead: z.string().min(1),
   summary: z.array(z.string()),
@@ -44,7 +76,7 @@ export const profileSchema = z.object({
       id: z.string().min(1),
       type: z.enum(["email", "github", "website", "external"]),
       label: z.string().min(1),
-      href: z.string().min(1),
+      href: safeUrlSchema(),
     }),
   ),
 });
@@ -61,7 +93,7 @@ export const educationSchema = z.object({
   status: statusSchema.default("published"),
   highlight: z.boolean().default(true),
   bullets: z.array(z.string()).default([]),
-  links: z.array(z.object({ label: z.string().min(1), href: z.string().min(1) })).default([]),
+  links: z.array(z.object({ label: z.string().min(1), href: safeUrlSchema() })).default([]),
   relatedProjects: z.array(z.string()).default([]),
   relatedSkills: z.array(z.string()).default([]),
 });
@@ -71,7 +103,7 @@ export const researchSchema = z.object({
   title: z.string().min(1),
   desc: z.string().min(1),
   status: statusSchema,
-  coverImage: z.string().optional(),
+  coverImage: optionalSafeUrlSchema(),
   showDiagram: z.boolean(),
   body: z.string(),
   relatedNotes: z.array(z.string()),
@@ -89,11 +121,11 @@ export const projectSchema = z.object({
   metrics: z.array(projectMetricSchema).optional(),
   evaluation: projectEvaluationSchema.optional(),
   tags: z.array(z.string()),
-  link: z.string(),
+  link: safeUrlSchema({ allowEmpty: true }),
   highlight: z.boolean(),
   private: z.boolean(),
   status: statusSchema,
-  coverImage: z.string().optional(),
+  coverImage: optionalSafeUrlSchema(),
   body: z.string(),
   relatedNotes: z.array(z.string()),
 });
@@ -105,7 +137,7 @@ export const skillGroupSchema = z.object({
 
 export const starredRepoSchema = z.object({
   name: z.string().min(1),
-  href: z.string().min(1),
+  href: safeUrlSchema(),
   stars: z.string().min(1),
   desc: z.string().min(1),
 });

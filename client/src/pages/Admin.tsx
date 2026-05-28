@@ -625,7 +625,7 @@ export default function Admin() {
   async function postJson(path: string, payload: unknown) {
     const response = await fetch(path, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Namuori-Admin-Request": "1" },
       body: JSON.stringify(payload),
     });
     const data = await response.json().catch(() => ({}));

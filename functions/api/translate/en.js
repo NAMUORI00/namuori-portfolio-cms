@@ -1,7 +1,9 @@
+import { requireAdminMutationRequest } from "../../_utils/security.js";
 import { requireSession } from "../../_utils/session.js";
 
 const MAX_ENTRIES = 40;
 const MAX_TEXT_LENGTH = 6000;
+const MAX_TOTAL_TEXT_LENGTH = 48000;
 const MODEL = "@cf/meta/m2m100-1.2b";
 
 function cleanEntry(value) {
@@ -30,6 +32,8 @@ async function translate(env, text) {
 export async function onRequestPost({ env, request }) {
   const auth = await requireSession(env, request);
   if (auth.response) return auth.response;
+  const mutation = requireAdminMutationRequest(env, request);
+  if (mutation) return mutation;
 
   if (!env.AI || typeof env.AI.run !== "function") {
     return Response.json({ error: "Cloudflare Workers AI binding is not configured" }, { status: 501 });
@@ -45,6 +49,10 @@ export async function onRequestPost({ env, request }) {
   const entries = (Array.isArray(payload.entries) ? payload.entries : []).map(cleanEntry).filter(Boolean).slice(0, MAX_ENTRIES);
   if (entries.length === 0) {
     return Response.json({ error: "No translation entries provided" }, { status: 400 });
+  }
+  const totalTextLength = entries.reduce((sum, entry) => sum + entry.text.length, 0);
+  if (totalTextLength > MAX_TOTAL_TEXT_LENGTH) {
+    return Response.json({ error: "Translation request is too large" }, { status: 413 });
   }
 
   try {
