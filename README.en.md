@@ -22,8 +22,6 @@ The main flow is:
 
 `content/` data moves through the `/admin` editor, becomes a GitHub branch and PR, and is then built by Cloudflare Pages into the public `namuori.net` site.
 
-The source SVG is available at [docs/assets/portfolio-cms-principle.svg](docs/assets/portfolio-cms-principle.svg).
-
 ## Production URLs
 
 - Public site: `https://namuori.net`
@@ -187,4 +185,4 @@ The principle diagram in this README was designed with the `paperbanana` skill's
 - Goal: make the responsibilities of the CMS, GitHub PRs, and Cloudflare deployment easy to distinguish at a glance
 - Visual strategy: six left-to-right pipeline stages
 - Review criteria: arrow direction, admin authentication, draft branch, PR, preview, and production deployment must match the implementation
-- Final README asset: uses an English-labeled PNG, with the matching source SVG available in the repository
+- Final README asset: uses a GPT-generated English-labeled PNG
